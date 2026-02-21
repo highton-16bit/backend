@@ -46,6 +46,11 @@ data class PostCreateResponse(
     val summary: String
 )
 
+@Serializable
+data class PostListResponse(
+    val posts: List<PostResponse>
+)
+
 // 게시글에 photos 정보를 포함하여 반환하는 헬퍼 함수
 private suspend fun getPostWithPhotos(postId: UUID): PostResponse? {
     return dbQuery {
@@ -84,7 +89,7 @@ fun Route.postRoutes(geminiService: GeminiService) {
 
         // 피드 조회 (photos 포함)
         get {
-            val posts = dbQuery {
+            val posts: List<PostResponse> = dbQuery {
                 val allPosts = Posts.selectAll()
                     .orderBy(Posts.createdAt to SortOrder.DESC)
                     .toList()
@@ -119,7 +124,7 @@ fun Route.postRoutes(geminiService: GeminiService) {
                     )
                 }
             }
-            call.respond(posts)
+            call.respond(PostListResponse(posts = posts))
         }
 
         // 게시글 상세 조회
@@ -220,7 +225,7 @@ fun Route.postRoutes(geminiService: GeminiService) {
         // 북마크 목록 (photos 포함)
         get("/bookmarks") {
             val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
-            val bookmarkedPosts = dbQuery {
+            val bookmarkedPosts: List<PostResponse> = dbQuery {
                 (Bookmarks innerJoin Posts).selectAll().where { Bookmarks.userId eq userId }
                     .orderBy(Bookmarks.createdAt to SortOrder.DESC)
                     .map { row ->
@@ -253,7 +258,7 @@ fun Route.postRoutes(geminiService: GeminiService) {
                         )
                     }
             }
-            call.respond(bookmarkedPosts)
+            call.respond(PostListResponse(posts = bookmarkedPosts))
         }
     }
 }

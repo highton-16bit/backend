@@ -1,11 +1,15 @@
 import { apiClient } from './api'
 import type { Post, CreatePostRequest } from '../types'
 
+interface PostListResponse {
+  posts: Post[]
+}
+
 export const postService = {
   // 피드 조회 (전체 공개 게시글)
   getFeed: async (): Promise<Post[]> => {
-    const response = await apiClient.get<Post[]>('/posts')
-    return response.data
+    const response = await apiClient.get<PostListResponse>('/posts')
+    return response.data.posts
   },
 
   // 게시글 상세 조회
@@ -32,7 +36,7 @@ export const postService = {
 
   // 북마크한 게시글 목록
   getBookmarks: async (): Promise<Post[]> => {
-    const response = await apiClient.get<Post[]>('/posts/bookmarks')
-    return response.data
+    const response = await apiClient.get<PostListResponse>('/posts/bookmarks')
+    return response.data.posts
   },
 }
