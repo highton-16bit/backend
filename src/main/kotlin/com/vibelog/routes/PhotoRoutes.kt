@@ -47,7 +47,7 @@ fun Route.photoRoutes(supabaseService: SupabaseService) {
         get {
             val travelId = UUID.fromString(call.parameters["id"])
             val photos = dbQuery {
-                TravelPhotos.select { TravelPhotos.travelId eq travelId }
+                TravelPhotos.selectAll().where { TravelPhotos.travelId eq travelId }
                     .map { row ->
                         mapOf(
                             "id" to row[TravelPhotos.id].toString(),

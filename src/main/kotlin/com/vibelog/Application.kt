@@ -60,7 +60,7 @@ fun Application.configureRouting(supabaseService: SupabaseService) {
         
         authRoutes()
         travelRoutes()
-        postRoutes(geminiApiKey)
+        postRoutes()
         searchRoutes(geminiApiKey)
         photoRoutes(supabaseService)
     }

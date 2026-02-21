@@ -14,7 +14,7 @@ import java.util.*
 suspend fun ApplicationCall.getUserIdFromHeader(): UUID? {
     val username = request.headers["Authorization"] ?: return null
     return dbQuery {
-        Users.select { Users.username eq username }
+        Users.selectAll().where { Users.username eq username }
             .map { it[Users.id] }
             .singleOrNull()
     }
@@ -27,7 +27,7 @@ fun Route.authRoutes() {
             val request = call.receive<AuthRequest>()
             
             dbQuery {
-                val existingUser = Users.select { Users.username eq request.username }.singleOrNull()
+                val existingUser = Users.selectAll().where { Users.username eq request.username }.singleOrNull()
                 if (existingUser == null) {
                     Users.insert {
                         it[username] = request.username

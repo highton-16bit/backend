@@ -4,26 +4,33 @@
 
 ### 1. Application Layer (Railway Hosting)
 - **Role:** 메인 비즈니스 로직 처리, AI(Gemini) 연동, 이미지 업로드 프록시.
-- **Endpoint:** `https://plog-api-production.up.railway.app` (예시)
+- **Endpoint:** `https://plog-api-production.up.railway.app`
 - **Tech Stack:** Kotlin + Ktor + Netty + Kotlin Coroutines.
 
 ### 2. Infrastructure Layer (Supabase Managed)
 - **Database:** PostgreSQL (Relation-based Travel & Post Data).
-- **Storage:** Supabase Storage (Object Storage for Trip Photos).
-- **Auth:** Supabase Auth (Seamless Identity Service).
+- **Storage:** Supabase Storage (Object Storage for Snapshot Photos).
 
-## 🗄️ 데이터베이스 설계 (ERD)
+## 🗄️ 데이터베이스 설계 (Exposed ORM)
 
-### Travels (여행 대장)
-- `id` (UUID, PK), `user_id` (UUID), `title` (TEXT), `start_date` (DATE), `end_date` (DATE), `region_name` (TEXT), `is_public` (BOOL).
+### 1. Users (유저)
+- `id` (UUID), `username` (Unique TEXT)
 
-### TravelPlanItems (상세 일정)
-- `id` (UUID, PK), `travel_id` (UUID, FK), `date` (DATE), `time` (TEXT), `place_name` (TEXT), `memo` (TEXT), `order_index` (INT).
+### 2. Travels (여행 대장)
+- `id` (UUID), `userId` (FK), `title`, `startDate`, `endDate`, `regionName`, `isPublic`
 
-### Posts (게시글)
-- `id` (UUID, PK), `travel_id` (UUID, FK), `user_id` (UUID), `title` (TEXT), `content_summary` (AI Generated Text), `like_count` (INT).
+### 3. TravelPlanItems (상세 일정)
+- `id`, `travelId` (FK), `date`, `startTime`, `endTime`, `memo`, `orderIndex`
 
-## 📡 프론트엔드 협업 전략 (Zero-Config Strategy)
-- **이미지 업로드:** Frontend ➡️ Plog API (`POST /api/v1/photos`) ➡️ Backend ➡️ Supabase Storage ➡️ Frontend (URL 반환).
-- **인증:** Frontend ➡️ Plog API (`POST /api/v1/auth/login`) ➡️ UUID/Token 반환.
-- **결과:** 프론트엔드 팀원은 수파베이스 API Key나 SDK를 몰라도 되며, 오직 Plog API만 사용하여 개발 가능.
+### 4. TravelPhotos (사진)
+- `id`, `travelId` (FK), `imageUrl`, `isSnapshot` (Boolean)
+
+### 5. Posts (게시글)
+- `id`, `travelId` (FK), `userId` (FK), `title`, `contentSummary` (Static Text), `likeCount`, `cloneCount`
+
+### 6. PostLikes & Bookmarks (소셜)
+- 유저별 좋아요 및 북마크 토글 상태 저장.
+
+## 📡 API 연동 전략
+- **Header Auth:** `Authorization: {username}` 헤더를 통해 모든 요청의 유저 식별.
+- **Proxy Upload:** 백엔드 `/photos/upload`를 통해 수파베이스 클라우드 스토리지 간접 이용.

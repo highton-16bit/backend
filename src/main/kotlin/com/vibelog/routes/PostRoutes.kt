@@ -11,6 +11,7 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import java.util.*
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -49,7 +50,7 @@ fun Route.postRoutes() {
             val travelId = UUID.fromString(request.travelId)
             
             val plans = dbQuery {
-                TravelPlanItems.select { TravelPlanItems.travelId eq travelId }
+                TravelPlanItems.selectAll().where { TravelPlanItems.travelId eq travelId }
                     .orderBy(TravelPlanItems.date to SortOrder.ASC)
                     .orderBy(TravelPlanItems.startTime to SortOrder.ASC)
                     .map { row ->
@@ -93,13 +94,13 @@ fun Route.postRoutes() {
             val postId = UUID.fromString(call.parameters["id"])
             
             dbQuery {
-                val existingLike = PostLikes.select { (PostLikes.userId eq userId) and (PostLikes.postId eq postId) }.singleOrNull()
+                val existingLike = PostLikes.selectAll().where { (PostLikes.userId eq userId) and (PostLikes.postId eq postId) }.singleOrNull()
                 if (existingLike == null) {
                     PostLikes.insert { it[PostLikes.userId] = userId; it[PostLikes.postId] = postId }
-                    Posts.update({ Posts.id eq postId }) { it[likeCount] = likeCount + 1 }
+                    Posts.update({ Posts.id eq postId }) { it[Posts.likeCount] = Posts.likeCount + 1 }
                 } else {
                     PostLikes.deleteWhere { (PostLikes.userId eq userId) and (PostLikes.postId eq postId) }
-                    Posts.update({ Posts.id eq postId }) { it[likeCount] = likeCount - 1 }
+                    Posts.update({ Posts.id eq postId }) { it[Posts.likeCount] = Posts.likeCount - 1 }
                 }
             }
             call.respond(HttpStatusCode.OK)
@@ -111,7 +112,7 @@ fun Route.postRoutes() {
             val postId = UUID.fromString(call.parameters["id"])
             
             dbQuery {
-                val existingBookmark = Bookmarks.select { (Bookmarks.userId eq userId) and (Bookmarks.postId eq postId) }.singleOrNull()
+                val existingBookmark = Bookmarks.selectAll().where { (Bookmarks.userId eq userId) and (Bookmarks.postId eq postId) }.singleOrNull()
                 if (existingBookmark == null) {
                     Bookmarks.insert { it[userId] = userId; it[postId] = postId }
                 } else {
@@ -125,7 +126,7 @@ fun Route.postRoutes() {
         get("/bookmarks") {
             val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val bookmarkedPosts = dbQuery {
-                (Bookmarks innerJoin Posts).select { Bookmarks.userId eq userId }
+                (Bookmarks innerJoin Posts).selectAll().where { Bookmarks.userId eq userId }
                     .orderBy(Bookmarks.createdAt to SortOrder.DESC)
                     .map { row ->
                         mapOf(

@@ -27,7 +27,7 @@ fun Route.travelRoutes() {
         get {
             val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val travels = dbQuery {
-                Travels.select { Travels.userId eq userId }
+                Travels.selectAll().where { Travels.userId eq userId }
                     .orderBy(Travels.createdAt to SortOrder.DESC)
                     .map { row ->
                         TravelDTO(
@@ -63,7 +63,7 @@ fun Route.travelRoutes() {
         get("/{id}/plans") {
             val travelId = UUID.fromString(call.parameters["id"])
             val plans = dbQuery {
-                TravelPlanItems.select { TravelPlanItems.travelId eq travelId }
+                TravelPlanItems.selectAll().where { TravelPlanItems.travelId eq travelId }
                     .orderBy(TravelPlanItems.date to SortOrder.ASC)
                     .orderBy(TravelPlanItems.startTime to SortOrder.ASC)
                     .map { row ->

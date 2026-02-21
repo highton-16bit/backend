@@ -14,6 +14,7 @@ import com.vibelog.models.*
 import com.vibelog.plugins.dbQuery
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.ilike
 import java.util.*
 import kotlinx.serialization.json.*
 
@@ -30,7 +31,7 @@ fun Route.searchRoutes(apiKey: String) {
             val q = call.request.queryParameters["q"] ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing query")
             
             val dbPosts = dbQuery {
-                Posts.select { Posts.contentSummary ilike "%$q%" }
+                Posts.selectAll().where { Posts.contentSummary ilike "%$q%" }
                     .limit(3)
                     .map { row ->
                         mapOf(
@@ -70,11 +71,17 @@ fun Route.searchRoutes(apiKey: String) {
         post("/clone/{id}") {
             val postId = UUID.fromString(call.parameters["id"])
             
-            val postSummary = dbQuery {
-                Posts.select { Posts.id eq postId }
-                    .map { it[Posts.contentSummary] }
-                    .singleOrNull()
-            } ?: return@post call.respond(HttpStatusCode.NotFound, "Post not found")
+                        val postSummary = dbQuery {
+            
+                            Posts.selectAll().where { Posts.id eq postId }
+            
+                                .map { it[Posts.contentSummary] }
+            
+                                .singleOrNull()
+            
+                        }
+            
+             ?: return@post call.respond(HttpStatusCode.NotFound, "Post not found")
             
             if (apiKey.isNotEmpty() && postSummary != null) {
                 val prompt = """
@@ -111,7 +118,7 @@ fun Route.searchRoutes(apiKey: String) {
                     
                     // 클론 횟수 증가 (성공 시에만)
                     dbQuery {
-                        Posts.update({ Posts.id eq postId }) { it[cloneCount] = cloneCount + 1 }
+                        Posts.update({ Posts.id eq postId }) { it[Posts.cloneCount] = Posts.cloneCount + 1 }
                     }
                     
                     call.respond(jsonResult)
