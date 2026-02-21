@@ -6,6 +6,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import com.vibelog.models.*
+import kotlinx.coroutines.Dispatchers
 
 fun Application.configureDatabase() {
     val config = environment.config.config("storage")

@@ -38,7 +38,7 @@ class GeminiService(private val apiKey: String) {
     private suspend fun callGemini(prompt: String): String? {
         return try {
             val response = client.post(apiUrl) {
-                contentType(ContentType.Application.JSON)
+                contentType(ContentType.Application.Json)
                 setBody(buildJsonObject {
                     putJsonArray("contents") {
                         addJsonObject {
@@ -57,31 +57,3 @@ class GeminiService(private val apiKey: String) {
     }
 }
 
-class SupabaseService(private val url: String, private val key: String) {
-    private val client = HttpClient {
-        install(ContentNegotiation) {
-            json()
-        }
-    }
-
-    suspend fun uploadToSupabase(fileName: String, fileBytes: ByteArray): String? {
-        if (url.isEmpty() || key.isEmpty()) return null
-        val bucketName = "photos"
-        val extension = fileName.substringAfterLast(".", "jpg")
-        val uniquePath = "${UUID.randomUUID()}.$extension"
-        
-        return try {
-            val response = client.post("$url/storage/v1/object/$bucketName/$uniquePath") {
-                header("Authorization", "Bearer $key")
-                header("apikey", key)
-                contentType(ContentType.parse("image/$extension"))
-                setBody(fileBytes)
-            }
-            if (response.status == HttpStatusCode.OK) {
-                "$url/storage/v1/object/public/$bucketName/$uniquePath"
-            } else null
-        } catch (e: Exception) {
-            null
-        }
-    }
-}

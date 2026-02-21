@@ -15,6 +15,7 @@ import com.vibelog.plugins.dbQuery
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.ilike
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import java.util.*
 import kotlinx.serialization.json.*
 
@@ -31,7 +32,7 @@ fun Route.searchRoutes(apiKey: String) {
             val q = call.request.queryParameters["q"] ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing query")
             
             val dbPosts = dbQuery {
-                Posts.selectAll().where { Posts.contentSummary ilike "%$q%" }
+                Posts.selectAll().where { Posts.contentSummary.ilike("%$q%") }
                     .limit(3)
                     .map { row ->
                         mapOf(
@@ -47,7 +48,7 @@ fun Route.searchRoutes(apiKey: String) {
                 val prompt = "$context\n\n사용자의 질문: '$q'\n위의 유저 기록들과 너의 지식을 합쳐서 최고의 답변을 줘. 추천 장소와 간단한 이유를 포함해줘."
                 
                 val response = client.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey") {
-                    contentType(ContentType.Application.JSON)
+                    contentType(ContentType.Application.Json)
                     setBody(buildJsonObject {
                         putJsonArray("contents") {
                             addJsonObject {
@@ -97,7 +98,7 @@ fun Route.searchRoutes(apiKey: String) {
                 """.trimIndent()
                 
                 val response = client.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey") {
-                    contentType(ContentType.Application.JSON)
+                    contentType(ContentType.Application.Json)
                     setBody(buildJsonObject {
                         putJsonArray("contents") {
                             addJsonObject {

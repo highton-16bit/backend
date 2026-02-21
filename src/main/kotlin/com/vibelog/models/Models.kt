@@ -3,6 +3,7 @@ package com.vibelog.models
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.kotlin.datetime.date
 import org.jetbrains.exposed.sql.kotlin.datetime.datetime
+import org.jetbrains.exposed.sql.kotlin.datetime.CurrentDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime

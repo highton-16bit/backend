@@ -10,6 +10,7 @@ import com.vibelog.plugins.dbQuery
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import java.util.*
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
