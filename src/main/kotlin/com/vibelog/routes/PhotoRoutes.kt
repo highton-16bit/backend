@@ -42,23 +42,22 @@ fun Route.photoRoutes(supabaseService: SupabaseService) {
         }
     }
 
-    // 여행별 사진 관리 (Snapshot 반영)
-    route("/travels/{id}/photos") {
-        get {
-            val travelId = UUID.fromString(call.parameters["id"])
-            val photos = dbQuery {
-                TravelPhotos.selectAll().where { TravelPhotos.travelId eq travelId }
-                    .map { row ->
-                        mapOf(
-                            "id" to row[TravelPhotos.id].toString(),
-                            "imageUrl" to row[TravelPhotos.imageUrl],
-                            "isSnapshot" to row[TravelPhotos.isSnapshot]
-                        )
-                    }
+        // 여행별 사진 관리 (Snapshot 반영)
+        route("/travels/{id}/photos") {
+            get {
+                val travelId = UUID.fromString(call.parameters["id"])
+                val photos = dbQuery {
+                    TravelPhotos.selectAll().where { TravelPhotos.travelId eq travelId }
+                        .map { row ->
+                            PhotoDTO(
+                                id = row[TravelPhotos.id].toString(),
+                                imageUrl = row[TravelPhotos.imageUrl],
+                                isSnapshot = row[TravelPhotos.isSnapshot]
+                            )
+                        }
+                }
+                call.respond(photos)
             }
-            call.respond(photos)
-        }
-
         post {
             val travelId = UUID.fromString(call.parameters["id"])
             val request = call.receive<SnapshotRegisterRequest>()

@@ -98,3 +98,10 @@ data class PlanItemDTO(val id: String, val date: String, val startTime: String?,
 
 @Serializable
 data class SnapshotRegisterRequest(val imageUrl: String, val isSnapshot: Boolean = true)
+
+@Serializable
+data class PhotoDTO(
+    val id: String,
+    val imageUrl: String,
+    val isSnapshot: Boolean
+)
