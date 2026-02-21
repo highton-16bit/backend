@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Heart, Bookmark, Share2, PlusSquare, ChevronLeft, ChevronRight, Copy } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Heart, Bookmark, Share2, PlusSquare, Copy, ChevronDown, ChevronUp } from 'lucide-react'
 import type { Post } from '../../types'
 import Modal from '../common/Modal'
 
@@ -12,6 +12,8 @@ interface PostDetailProps {
   onClone?: () => void
 }
 
+const MAX_CONTENT_LENGTH = 150
+
 export default function PostDetail({
   post,
   isOpen,
@@ -21,74 +23,82 @@ export default function PostDetail({
   onClone,
 }: PostDetailProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const carouselRef = useRef<HTMLDivElement>(null)
 
   if (!post) return null
 
   const photos = post.photos || []
   const hasMultiplePhotos = photos.length > 1
 
-  const nextPhoto = () => {
-    if (currentPhotoIndex < photos.length - 1) {
-      setCurrentPhotoIndex(currentPhotoIndex + 1)
-    }
+  // 스크롤 시 현재 이미지 인덱스 업데이트
+  const handleScroll = () => {
+    if (!carouselRef.current) return
+    const scrollLeft = carouselRef.current.scrollLeft
+    const width = carouselRef.current.offsetWidth
+    const index = Math.round(scrollLeft / width)
+    setCurrentPhotoIndex(index)
   }
 
-  const prevPhoto = () => {
-    if (currentPhotoIndex > 0) {
-      setCurrentPhotoIndex(currentPhotoIndex - 1)
-    }
-  }
+  // 설명 접기/펼치기
+  const contentSummary = post.contentSummary || ''
+  const shouldTruncate = contentSummary.length > MAX_CONTENT_LENGTH
+  const displayContent = shouldTruncate && !isExpanded
+    ? contentSummary.slice(0, MAX_CONTENT_LENGTH) + '...'
+    : contentSummary
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <div className="max-h-[80vh] overflow-y-auto">
-        {/* Photo Slider */}
-        <div className="relative aspect-square bg-slate-100">
-          {photos.length > 0 ? (
-            <>
-              <img
-                src={photos[currentPhotoIndex].url}
-                alt={post.title}
-                className="w-full h-full object-cover"
-              />
+        {/* Photo Carousel - Swipeable */}
+        <div className="relative aspect-square bg-slate-100 overflow-hidden">
+          <div
+            ref={carouselRef}
+            onScroll={handleScroll}
+            className="w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide flex"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {photos.length > 0 ? (
+              photos.map((photo, index) => (
+                <div
+                  key={photo.id}
+                  className="w-full h-full flex-shrink-0 snap-center"
+                >
+                  <img
+                    src={photo.url}
+                    alt={`${post.title} ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    draggable={false}
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-slate-300">
+                No Image
+              </div>
+            )}
+          </div>
 
-              {/* Photo Navigation */}
-              {hasMultiplePhotos && (
-                <>
-                  {currentPhotoIndex > 0 && (
-                    <button
-                      onClick={prevPhoto}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white transition-colors"
-                    >
-                      <ChevronLeft size={20} />
-                    </button>
-                  )}
-                  {currentPhotoIndex < photos.length - 1 && (
-                    <button
-                      onClick={nextPhoto}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white transition-colors"
-                    >
-                      <ChevronRight size={20} />
-                    </button>
-                  )}
+          {/* Indicator Dots */}
+          {hasMultiplePhotos && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {photos.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${
+                    index === currentPhotoIndex
+                      ? 'bg-white w-3'
+                      : 'bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
 
-                  {/* Dots */}
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                    {photos.map((_, index) => (
-                      <div
-                        key={index}
-                        className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                          index === currentPhotoIndex ? 'bg-white' : 'bg-white/50'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-300">
-              No Image
+          {/* Image Counter */}
+          {hasMultiplePhotos && (
+            <div className="absolute top-3 right-3 bg-black/50 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+              {currentPhotoIndex + 1} / {photos.length}
             </div>
           )}
         </div>
@@ -133,15 +143,24 @@ export default function PostDetail({
             </p>
           </div>
 
-          {/* AI Summary */}
-          {post.contentSummary && (
-            <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100">
-              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2">
-                AI Summary
+          {/* Content */}
+          {contentSummary && (
+            <div className="bg-slate-50 p-5 rounded-2xl">
+              <p className="text-slate-700 text-sm leading-relaxed font-medium whitespace-pre-wrap">
+                {displayContent}
               </p>
-              <p className="text-slate-700 text-sm leading-relaxed font-medium">
-                {post.contentSummary}
-              </p>
+              {shouldTruncate && (
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="flex items-center gap-1 mt-2 text-blue-600 text-xs font-bold"
+                >
+                  {isExpanded ? (
+                    <>접기 <ChevronUp size={14} /></>
+                  ) : (
+                    <>자세히 보기 <ChevronDown size={14} /></>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
