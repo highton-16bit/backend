@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Header, BottomNav, type Tab } from './components/layout'
+import { LoadingOverlay } from './components/common'
 import { LoginPage, HomePage, DiscoveryPage, NewPage, TravelsPage, ProfilePage } from './pages'
 import { travelService, postService, authService } from './services'
 import type { Travel, Post } from './types'
@@ -63,7 +64,8 @@ export default function App() {
     <div className="flex flex-col h-screen max-w-md mx-auto bg-gray-50 shadow-2xl relative overflow-hidden font-sans text-slate-900">
       <Header isLoading={isLoading} />
 
-      <main className="flex-1 overflow-y-auto pb-24 scrollbar-hide">
+      <main className="flex-1 overflow-y-auto pb-24 scrollbar-hide relative">
+        <LoadingOverlay isLoading={isLoading} />
         {activeTab === 'home' && (
           <HomePage activeTravel={activeTravel} feed={feed} onRefresh={refreshData} />
         )}
