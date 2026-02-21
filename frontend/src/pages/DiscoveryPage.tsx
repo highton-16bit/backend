@@ -1,21 +1,32 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, Send, Loader2, User } from 'lucide-react'
 import type { Post, AISearchResponse } from '../types'
 import { PostGrid, PostDetail } from '../components/post'
+import { PhotoGridSkeleton, Skeleton } from '../components/common'
 import { searchService, postService } from '../services'
 import { getErrorMessage } from '../services/api'
 
 interface DiscoveryPageProps {
   posts: Post[]
+  setPosts: React.Dispatch<React.SetStateAction<Post[]>>
   onRefresh: () => void
+  isLoading?: boolean
 }
 
-export default function DiscoveryPage({ posts, onRefresh }: DiscoveryPageProps) {
+export default function DiscoveryPage({ posts, setPosts, onRefresh, isLoading }: DiscoveryPageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [aiResponse, setAiResponse] = useState<AISearchResponse | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+
+  // Sync selectedPost with posts state
+  useEffect(() => {
+    if (selectedPost) {
+      const updated = posts.find(p => p.id === selectedPost.id)
+      if (updated) setSelectedPost(updated)
+    }
+  }, [posts, selectedPost])
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
@@ -36,22 +47,62 @@ export default function DiscoveryPage({ posts, onRefresh }: DiscoveryPageProps) 
     setIsDetailOpen(true)
   }
 
+  // Optimistic UI Update for Like
   const handleLike = async () => {
     if (!selectedPost) return
+
+    // Optimistic update
+    setPosts(prev => prev.map(p => {
+      if (p.id === selectedPost.id) {
+        return {
+          ...p,
+          isLiked: !p.isLiked,
+          likeCount: p.isLiked ? p.likeCount - 1 : p.likeCount + 1
+        }
+      }
+      return p
+    }))
+
     try {
       await postService.toggleLike(selectedPost.id)
-      onRefresh()
     } catch (error) {
+      // Rollback on error
+      setPosts(prev => prev.map(p => {
+        if (p.id === selectedPost.id) {
+          return {
+            ...p,
+            isLiked: selectedPost.isLiked,
+            likeCount: selectedPost.likeCount
+          }
+        }
+        return p
+      }))
       alert(getErrorMessage(error))
     }
   }
 
+  // Optimistic UI Update for Bookmark
   const handleBookmark = async () => {
     if (!selectedPost) return
+
+    // Optimistic update
+    setPosts(prev => prev.map(p => {
+      if (p.id === selectedPost.id) {
+        return { ...p, isBookmarked: !p.isBookmarked }
+      }
+      return p
+    }))
+
     try {
       await postService.toggleBookmark(selectedPost.id)
-      onRefresh()
     } catch (error) {
+      // Rollback on error
+      setPosts(prev => prev.map(p => {
+        if (p.id === selectedPost.id) {
+          return { ...p, isBookmarked: selectedPost.isBookmarked }
+        }
+        return p
+      }))
       alert(getErrorMessage(error))
     }
   }
@@ -65,6 +116,19 @@ export default function DiscoveryPage({ posts, onRefresh }: DiscoveryPageProps) 
     } catch (error) {
       alert(getErrorMessage(error))
     }
+  }
+
+  // Show skeleton during initial loading
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-8 animate-in fade-in duration-300">
+        <div className="space-y-4">
+          <Skeleton className="w-32 h-10" />
+          <Skeleton className="w-full h-16 rounded-[1.5rem]" />
+        </div>
+        <PhotoGridSkeleton count={9} />
+      </div>
+    )
   }
 
   return (

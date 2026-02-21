@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Header, BottomNav, type Tab } from './components/layout'
-import { LoadingOverlay } from './components/common'
 import { LoginPage, HomePage, DiscoveryPage, NewPage, TravelsPage, ProfilePage } from './pages'
 import { travelService, postService, authService } from './services'
 import type { Travel, Post } from './types'
@@ -8,7 +7,8 @@ import type { Travel, Post } from './types'
 export default function App() {
   const [user, setUser] = useState<string | null>(authService.getCurrentUser())
   const [activeTab, setActiveTab] = useState<Tab>('home')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set())
 
   // Data States
   const [activeTravel, setActiveTravel] = useState<Travel | null>(null)
@@ -16,35 +16,43 @@ export default function App() {
   const [discoveryPosts, setDiscoveryPosts] = useState<Post[]>([])
   const [myTravels, setMyTravels] = useState<Travel[]>([])
 
-  useEffect(() => {
-    if (user) {
-      refreshData()
-    }
-  }, [user, activeTab])
+  const loadTabData = useCallback(async (tab: Tab, isInitial: boolean) => {
+    if (isInitial) setIsInitialLoading(true)
 
-  const refreshData = async () => {
-    setIsLoading(true)
     try {
-      if (activeTab === 'home') {
+      if (tab === 'home') {
         const [travel, posts] = await Promise.all([
           travelService.getActive(),
           postService.getFeed(),
         ])
         setActiveTravel(travel)
         setFeed(posts)
-      } else if (activeTab === 'discovery') {
+      } else if (tab === 'discovery') {
         const posts = await postService.getFeed()
         setDiscoveryPosts(posts)
-      } else if (activeTab === 'travels' || activeTab === 'new') {
+      } else if (tab === 'travels' || tab === 'new') {
         const travels = await travelService.getAll()
         setMyTravels(travels)
       }
+      setLoadedTabs(prev => new Set(prev).add(tab))
     } catch (error) {
-      console.error('Failed to refresh data:', error)
+      console.error('Failed to load data:', error)
     } finally {
-      setIsLoading(false)
+      if (isInitial) setIsInitialLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (user) {
+      const isInitial = !loadedTabs.has(activeTab)
+      loadTabData(activeTab, isInitial)
+    }
+  }, [user, activeTab, loadTabData, loadedTabs])
+
+  // Background refresh without loading overlay
+  const refreshData = useCallback(async () => {
+    await loadTabData(activeTab, false)
+  }, [activeTab, loadTabData])
 
   const handleLogin = (username: string) => {
     setUser(username)
@@ -60,23 +68,35 @@ export default function App() {
     return <LoginPage onLogin={handleLogin} />
   }
 
+  const isTabLoading = isInitialLoading && !loadedTabs.has(activeTab)
+
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-gray-50 shadow-2xl relative overflow-hidden font-sans text-slate-900">
-      <Header isLoading={isLoading} />
+      <Header isLoading={false} />
 
       <main className="flex-1 overflow-y-auto pb-24 scrollbar-hide relative">
-        <LoadingOverlay isLoading={isLoading} />
         {activeTab === 'home' && (
-          <HomePage activeTravel={activeTravel} feed={feed} onRefresh={refreshData} />
+          <HomePage
+            activeTravel={activeTravel}
+            feed={feed}
+            setFeed={setFeed}
+            onRefresh={refreshData}
+            isLoading={isTabLoading}
+          />
         )}
         {activeTab === 'discovery' && (
-          <DiscoveryPage posts={discoveryPosts} onRefresh={refreshData} />
+          <DiscoveryPage
+            posts={discoveryPosts}
+            setPosts={setDiscoveryPosts}
+            onRefresh={refreshData}
+            isLoading={isTabLoading}
+          />
         )}
         {activeTab === 'new' && (
           <NewPage myTravels={myTravels} onComplete={() => setActiveTab('home')} />
         )}
         {activeTab === 'travels' && (
-          <TravelsPage travels={myTravels} onRefresh={refreshData} />
+          <TravelsPage travels={myTravels} onRefresh={refreshData} isLoading={isTabLoading} />
         )}
         {activeTab === 'profile' && (
           <ProfilePage username={user} onLogout={handleLogout} />

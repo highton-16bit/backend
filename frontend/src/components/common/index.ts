@@ -6,3 +6,11 @@ export { default as WheelColumn } from './WheelColumn'
 export { default as TimePicker } from './TimePicker'
 export { default as DatePicker } from './DatePicker'
 export { default as FAB } from './FAB'
+export {
+  Skeleton,
+  PostCardSkeleton,
+  TravelCardSkeleton,
+  PhotoGridSkeleton,
+  ActiveTravelSkeleton,
+  FeedSkeleton,
+} from './Skeleton'

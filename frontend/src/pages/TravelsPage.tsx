@@ -5,16 +5,17 @@ import { TravelCard, PhotoGallery, PhotoUploader, TimetableGrid } from '../compo
 import { travelService, photoService } from '../services'
 import { getErrorMessage } from '../services/api'
 import { validateTimeRange } from '../utils/validation'
-import { FAB, DatePicker, TimePicker, Modal, Input, Button } from '../components/common'
+import { FAB, DatePicker, TimePicker, Modal, Input, Button, TravelCardSkeleton, Skeleton } from '../components/common'
 
 interface TravelsPageProps {
   travels: Travel[]
   onRefresh: () => void
+  isLoading?: boolean
 }
 
 type SubTab = 'gallery' | 'plan'
 
-export default function TravelsPage({ travels, onRefresh: _onRefresh }: TravelsPageProps) {
+export default function TravelsPage({ travels, onRefresh: _onRefresh, isLoading }: TravelsPageProps) {
   const [selectedTravel, setSelectedTravel] = useState<Travel | null>(null)
   const [plans, setPlans] = useState<TravelPlanItem[]>([])
   const [photos, setPhotos] = useState<TravelPhoto[]>([])
@@ -242,6 +243,23 @@ export default function TravelsPage({ travels, onRefresh: _onRefresh }: TravelsP
             </p>
           </div>
         )}
+      </div>
+    )
+  }
+
+  // Travel List View - Skeleton
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-8 animate-in fade-in duration-300">
+        <div className="space-y-1">
+          <Skeleton className="w-40 h-10" />
+          <Skeleton className="w-28 h-4" />
+        </div>
+        <div className="grid grid-cols-1 gap-6">
+          <TravelCardSkeleton />
+          <TravelCardSkeleton />
+          <TravelCardSkeleton />
+        </div>
       </div>
     )
   }

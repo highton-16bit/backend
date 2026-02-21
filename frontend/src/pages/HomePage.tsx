@@ -1,32 +1,97 @@
 import { MapPin } from 'lucide-react'
 import type { Travel, Post } from '../types'
 import { PostCard } from '../components/post'
+import { ActiveTravelSkeleton, FeedSkeleton } from '../components/common'
 import { postService } from '../services'
 import { getErrorMessage } from '../services/api'
 
 interface HomePageProps {
   activeTravel: Travel | null
   feed: Post[]
+  setFeed: React.Dispatch<React.SetStateAction<Post[]>>
   onRefresh: () => void
+  isLoading?: boolean
 }
 
-export default function HomePage({ activeTravel, feed, onRefresh }: HomePageProps) {
+export default function HomePage({ activeTravel, feed, setFeed, onRefresh, isLoading }: HomePageProps) {
+  // Optimistic UI Update for Like
   const handleLike = async (postId: string) => {
+    const post = feed.find(p => p.id === postId)
+    if (!post) return
+
+    // Optimistic update
+    setFeed(prev => prev.map(p => {
+      if (p.id === postId) {
+        return {
+          ...p,
+          isLiked: !p.isLiked,
+          likeCount: p.isLiked ? p.likeCount - 1 : p.likeCount + 1
+        }
+      }
+      return p
+    }))
+
     try {
       await postService.toggleLike(postId)
-      onRefresh()
     } catch (error) {
+      // Rollback on error
+      setFeed(prev => prev.map(p => {
+        if (p.id === postId) {
+          return {
+            ...p,
+            isLiked: post.isLiked,
+            likeCount: post.likeCount
+          }
+        }
+        return p
+      }))
       alert(getErrorMessage(error))
     }
   }
 
+  // Optimistic UI Update for Bookmark
   const handleBookmark = async (postId: string) => {
+    const post = feed.find(p => p.id === postId)
+    if (!post) return
+
+    // Optimistic update
+    setFeed(prev => prev.map(p => {
+      if (p.id === postId) {
+        return { ...p, isBookmarked: !p.isBookmarked }
+      }
+      return p
+    }))
+
     try {
       await postService.toggleBookmark(postId)
-      onRefresh()
     } catch (error) {
+      // Rollback on error
+      setFeed(prev => prev.map(p => {
+        if (p.id === postId) {
+          return { ...p, isBookmarked: post.isBookmarked }
+        }
+        return p
+      }))
       alert(getErrorMessage(error))
     }
+  }
+
+  // Show skeleton during initial loading
+  if (isLoading) {
+    return (
+      <div className="animate-in fade-in duration-300">
+        <section className="p-6">
+          <ActiveTravelSkeleton />
+        </section>
+        <section className="px-6 pb-10 space-y-10">
+          <div className="flex justify-between items-center px-1">
+            <div className="w-32 h-8 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="w-16 h-6 bg-slate-200 rounded-full animate-pulse" />
+          </div>
+          <FeedSkeleton />
+        </section>
+      </div>
+    )
   }
 
   return (
