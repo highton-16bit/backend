@@ -2,7 +2,7 @@ import { useState, useReducer } from 'react'
 import { X, Calendar, Share2 } from 'lucide-react'
 import type { Travel, TravelPhoto, TravelPlanItem } from '../types'
 import { Input, DatePicker, Button } from '../components/common'
-import { TravelSelector, PhotoSelector, PostEditor } from '../components/share'
+import { TravelSelector, PhotoSelector, PostEditor, generateScheduleText } from '../components/share'
 import { travelService, postService } from '../services'
 import { getErrorMessage } from '../services/api'
 import { validateDateRange, validateRequired } from '../utils/validation'
@@ -78,6 +78,8 @@ function shareReducer(state: ShareState, action: ShareAction): ShareState {
         ...state,
         step: 'edit_post',
         photoOrder: state.selectedPhotoIds,
+        // 일정 텍스트로 content 초기화 (AI 없이 정적 변환)
+        postContent: state.postContent || generateScheduleText(state.travelPlans),
       }
     case 'BACK_TO_TRAVEL':
       return {
