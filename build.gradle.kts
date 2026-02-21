@@ -46,6 +46,9 @@ dependencies {
     // AWS S3 SDK for Supabase S3 Protocol
     implementation("software.amazon.awssdk:s3:2.20.162")
 
+    // Metadata Extractor (EXIF)
+    implementation("com.drewnoakes:metadata-extractor:2.19.0")
+
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 }

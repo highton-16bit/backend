@@ -48,6 +48,9 @@ object TravelPhotos : Table("travel_photos") {
     val travelId = uuid("travel_id").references(Travels.id)
     val imageUrl = text("image_url")
     val isSnapshot = bool("is_snapshot").default(false)
+    val latitude = double("latitude").nullable()
+    val longitude = double("longitude").nullable()
+    val capturedAt = datetime("captured_at").nullable()
     val createdAt = datetime("created_at").defaultExpression(CurrentDateTime)
     override val primaryKey = PrimaryKey(id)
 }
@@ -103,5 +106,8 @@ data class SnapshotRegisterRequest(val imageUrl: String, val isSnapshot: Boolean
 data class PhotoDTO(
     val id: String,
     val imageUrl: String,
-    val isSnapshot: Boolean
+    val isSnapshot: Boolean,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val capturedAt: String? = null
 )
