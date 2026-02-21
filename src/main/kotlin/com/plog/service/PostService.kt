@@ -28,28 +28,11 @@ class PostService(
 
     @Transactional
     fun create(user: User, travel: Travel, request: PostCreateRequest, photoIds: List<UUID>): PostCreateResponse {
-        // 일정 조회하여 AI 프롬프트 생성
-        val plans = planItemRepository.findByTravelIdOrderByDateAscStartTimeAsc(travel.id)
-            .map { "${it.date} ${it.startTime ?: ""} : ${it.memo ?: "일정"}" }
-
-        val prompt = """
-            다음은 사용자의 여행 일정 목록입니다:
-            ${plans.joinToString("\n")}
-
-            이 일정들을 바탕으로, 인스타그램에 올릴 만한 감성적이고 따뜻한 여행 에세이(본문)를 작성해주세요.
-            너무 길지 않게 3~5문장 정도로 작성해주고, 해시태그도 2~3개 포함해주세요.
-            이모지도 적절히 섞어주세요.
-        """.trimIndent()
-
-        // AI 요약 생성 (실패 시 일정 목록으로 대체)
-        val aiSummary = geminiService.generateText(prompt)
-            ?: plans.joinToString("\n").ifEmpty { "여행 기록" }
-
         val post = Post(
             travel = travel,
             user = user,
             title = request.title,
-            contentSummary = aiSummary
+            contentSummary = request.content
         )
 
         // 사진 매핑
@@ -60,7 +43,7 @@ class PostService(
         }
 
         val saved = postRepository.save(post)
-        return PostCreateResponse(id = saved.id.toString(), summary = aiSummary)
+        return PostCreateResponse(id = saved.id.toString(), summary = request.content ?: "")
     }
 
     @Transactional

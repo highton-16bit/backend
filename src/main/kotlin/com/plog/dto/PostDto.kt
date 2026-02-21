@@ -10,6 +10,9 @@ data class PostCreateRequest(
     @Schema(description = "게시글 제목", example = "제주도 여행 후기")
     val title: String,
 
+    @Schema(description = "본문 내용", example = "제주도에서의 멋진 여행 기록입니다.")
+    val content: String? = null,
+
     @Schema(description = "첨부할 사진 ID 목록")
     val photoIds: List<String> = emptyList()
 )

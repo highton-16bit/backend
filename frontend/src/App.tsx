@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Header, BottomNav, type Tab } from './components/layout'
 import { LoginPage, HomePage, DiscoveryPage, NewPage, TravelsPage, ProfilePage } from './pages'
 import { travelService, postService, authService } from './services'
@@ -8,7 +8,7 @@ export default function App() {
   const [user, setUser] = useState<string | null>(authService.getCurrentUser())
   const [activeTab, setActiveTab] = useState<Tab>('home')
   const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [loadedTabs, setLoadedTabs] = useState<Set<Tab>>(new Set())
+  const loadedTabsRef = useRef<Set<Tab>>(new Set())
 
   // Data States
   const [activeTravel, setActiveTravel] = useState<Travel | null>(null)
@@ -34,7 +34,7 @@ export default function App() {
         const travels = await travelService.getAll()
         setMyTravels(travels)
       }
-      setLoadedTabs(prev => new Set(prev).add(tab))
+      loadedTabsRef.current.add(tab)
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
@@ -44,10 +44,10 @@ export default function App() {
 
   useEffect(() => {
     if (user) {
-      const isInitial = !loadedTabs.has(activeTab)
+      const isInitial = !loadedTabsRef.current.has(activeTab)
       loadTabData(activeTab, isInitial)
     }
-  }, [user, activeTab, loadTabData, loadedTabs])
+  }, [user, activeTab, loadTabData])
 
   // Background refresh without loading overlay
   const refreshData = useCallback(async () => {
@@ -68,7 +68,7 @@ export default function App() {
     return <LoginPage onLogin={handleLogin} />
   }
 
-  const isTabLoading = isInitialLoading && !loadedTabs.has(activeTab)
+  const isTabLoading = isInitialLoading && !loadedTabsRef.current.has(activeTab)
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-gray-50 shadow-2xl relative overflow-hidden font-sans text-slate-900">
