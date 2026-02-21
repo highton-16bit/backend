@@ -17,6 +17,7 @@ import com.drew.metadata.exif.GpsDirectory
 import java.io.ByteArrayInputStream
 import kotlinx.datetime.toKotlinLocalDateTime
 import java.time.ZoneId
+import kotlinx.serialization.Serializable
 
 fun Route.photoRoutes(supabaseService: SupabaseService) {
     route("/photos") {
@@ -109,96 +110,50 @@ fun Route.photoRoutes(supabaseService: SupabaseService) {
         }
     }
 
-            // 여행별 사진 관리 (Snapshot 반영)
-
-            route("/travels/{id}/photos") {
-
-                get {
-
-                    val travelId = UUID.fromString(call.parameters["id"])
-
-                    val photos = dbQuery {
-
-                        TravelPhotos.selectAll().where { TravelPhotos.travelId eq travelId }
-
-                            .map { row ->
-
-                                PhotoDTO(
-
-                                    id = row[TravelPhotos.id].toString(),
-
-                                    imageUrl = row[TravelPhotos.imageUrl],
-
-                                    isSnapshot = row[TravelPhotos.isSnapshot],
-
-                                    latitude = row[TravelPhotos.latitude],
-
-                                    longitude = row[TravelPhotos.longitude],
-
-                                    capturedAt = row[TravelPhotos.capturedAt]?.toString()
-
-                                )
-
-                            }
-
+    // 여행별 사진 관리 (Snapshot 반영)
+    route("/travels/{id}/photos") {
+        get {
+            val travelId = UUID.fromString(call.parameters["id"])
+            val photos = dbQuery {
+                TravelPhotos.selectAll().where { TravelPhotos.travelId eq travelId }
+                    .map { row ->
+                        PhotoDTO(
+                            id = row[TravelPhotos.id].toString(),
+                            imageUrl = row[TravelPhotos.imageUrl],
+                            isSnapshot = row[TravelPhotos.isSnapshot],
+                            latitude = row[TravelPhotos.latitude],
+                            longitude = row[TravelPhotos.longitude],
+                            capturedAt = row[TravelPhotos.capturedAt]?.toString()
+                        )
                     }
-
-                    call.respond(photos)
-
-                }
-
-        
-
-                post {
-
-                    val travelId = UUID.fromString(call.parameters["id"])
-
-                    val request = call.receive<SnapshotMetadataRequest>()
-
-                    
-
-                    val photoId = dbQuery {
-
-                        TravelPhotos.insert {
-
-                            it[TravelPhotos.travelId] = travelId
-
-                            it[TravelPhotos.imageUrl] = request.imageUrl
-
-                            it[TravelPhotos.isSnapshot] = request.isSnapshot
-
-                            it[TravelPhotos.latitude] = request.latitude
-
-                            it[TravelPhotos.longitude] = request.longitude
-
-                            it[TravelPhotos.capturedAt] = request.capturedAt?.let { ts -> kotlinx.datetime.LocalDateTime.parse(ts) }
-
-                        } get TravelPhotos.id
-
-                    }
-
-                    call.respond(HttpStatusCode.Created, mapOf("id" to photoId.toString()))
-
-                }
-
             }
-
+            call.respond(photos)
         }
 
-        
+        post {
+            val travelId = UUID.fromString(call.parameters["id"])
+            val request = call.receive<SnapshotMetadataRequest>()
 
-        @Serializable
+            val photoId = dbQuery {
+                TravelPhotos.insert {
+                    it[TravelPhotos.travelId] = travelId
+                    it[TravelPhotos.imageUrl] = request.imageUrl
+                    it[TravelPhotos.isSnapshot] = request.isSnapshot
+                    it[TravelPhotos.latitude] = request.latitude
+                    it[TravelPhotos.longitude] = request.longitude
+                    it[TravelPhotos.capturedAt] = request.capturedAt?.let { ts -> kotlinx.datetime.LocalDateTime.parse(ts) }
+                } get TravelPhotos.id
+            }
+            call.respond(HttpStatusCode.Created, mapOf("id" to photoId.toString()))
+        }
+    }
+}
 
-        data class SnapshotMetadataRequest(
-
-            val imageUrl: String,
-
-            val isSnapshot: Boolean = true,
-
-            val latitude: Double? = null,
-
-            val longitude: Double? = null,
-
-            val capturedAt: String? = null
-
-        )
+@Serializable
+data class SnapshotMetadataRequest(
+    val imageUrl: String,
+    val isSnapshot: Boolean = true,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val capturedAt: String? = null
+)

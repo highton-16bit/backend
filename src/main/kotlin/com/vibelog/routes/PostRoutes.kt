@@ -22,26 +22,115 @@ data class PostCreateRequest(
     val photoIds: List<String>
 )
 
+@Serializable
+data class PostPhotoResponse(
+    val id: String,
+    val url: String
+)
+
+@Serializable
+data class PostResponse(
+    val id: String,
+    val title: String,
+    val contentSummary: String?,
+    val likeCount: Int,
+    val cloneCount: Int,
+    val createdAt: String,
+    val username: String?,
+    val photos: List<PostPhotoResponse>
+)
+
+@Serializable
+data class PostCreateResponse(
+    val id: String,
+    val summary: String
+)
+
+// 게시글에 photos 정보를 포함하여 반환하는 헬퍼 함수
+private suspend fun getPostWithPhotos(postId: UUID): PostResponse? {
+    return dbQuery {
+        val postRow = Posts.selectAll().where { Posts.id eq postId }.singleOrNull()
+            ?: return@dbQuery null
+
+        val photos = (PostPhotoMappings innerJoin TravelPhotos)
+            .selectAll().where { PostPhotoMappings.postId eq postId }
+            .map { photoRow ->
+                PostPhotoResponse(
+                    id = photoRow[TravelPhotos.id].toString(),
+                    url = photoRow[TravelPhotos.imageUrl]
+                )
+            }
+
+        // 유저 이름 조회
+        val username = Users.selectAll().where { Users.id eq postRow[Posts.userId] }
+            .map { it[Users.username] }
+            .singleOrNull()
+
+        PostResponse(
+            id = postRow[Posts.id].toString(),
+            title = postRow[Posts.title],
+            contentSummary = postRow[Posts.contentSummary],
+            likeCount = postRow[Posts.likeCount],
+            cloneCount = postRow[Posts.cloneCount],
+            createdAt = postRow[Posts.createdAt].toString(),
+            username = username,
+            photos = photos
+        )
+    }
+}
+
 fun Route.postRoutes(geminiService: GeminiService) {
     route("/posts") {
-        
-        // 피드 조회
+
+        // 피드 조회 (photos 포함)
         get {
             val posts = dbQuery {
-                Posts.selectAll()
+                val allPosts = Posts.selectAll()
                     .orderBy(Posts.createdAt to SortOrder.DESC)
-                    .map { row ->
-                        mapOf(
-                            "id" to row[Posts.id].toString(),
-                            "title" to row[Posts.title],
-                            "contentSummary" to row[Posts.contentSummary],
-                            "likeCount" to row[Posts.likeCount],
-                            "cloneCount" to row[Posts.cloneCount],
-                            "createdAt" to row[Posts.createdAt].toString()
-                        )
-                    }
+                    .toList()
+
+                allPosts.map { row ->
+                    val postId = row[Posts.id]
+
+                    // 해당 게시글의 사진들 조회
+                    val photos = (PostPhotoMappings innerJoin TravelPhotos)
+                        .selectAll().where { PostPhotoMappings.postId eq postId }
+                        .map { photoRow ->
+                            PostPhotoResponse(
+                                id = photoRow[TravelPhotos.id].toString(),
+                                url = photoRow[TravelPhotos.imageUrl]
+                            )
+                        }
+
+                    // 유저 이름 조회
+                    val username = Users.selectAll().where { Users.id eq row[Posts.userId] }
+                        .map { it[Users.username] }
+                        .singleOrNull()
+
+                    PostResponse(
+                        id = postId.toString(),
+                        title = row[Posts.title],
+                        contentSummary = row[Posts.contentSummary],
+                        likeCount = row[Posts.likeCount],
+                        cloneCount = row[Posts.cloneCount],
+                        createdAt = row[Posts.createdAt].toString(),
+                        username = username,
+                        photos = photos
+                    )
+                }
             }
             call.respond(posts)
+        }
+
+        // 게시글 상세 조회
+        get("/{id}") {
+            val postId = UUID.fromString(call.parameters["id"])
+            val post = getPostWithPhotos(postId)
+            if (post == null) {
+                call.respond(HttpStatusCode.NotFound, "Post not found")
+            } else {
+                call.respond(post)
+            }
         }
 
         // 게시글 생성 (Gemini AI Flattening 연동)
@@ -91,7 +180,7 @@ fun Route.postRoutes(geminiService: GeminiService) {
                 postId
             }
             
-            call.respond(HttpStatusCode.Created, mapOf("id" to newPostId.toString(), "summary" to aiSummary))
+            call.respond(HttpStatusCode.Created, PostCreateResponse(id = newPostId.toString(), summary = aiSummary))
         }
 
         // 좋아요 토글
@@ -128,19 +217,39 @@ fun Route.postRoutes(geminiService: GeminiService) {
             call.respond(HttpStatusCode.OK)
         }
 
-        // 북마크 목록
+        // 북마크 목록 (photos 포함)
         get("/bookmarks") {
             val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val bookmarkedPosts = dbQuery {
                 (Bookmarks innerJoin Posts).selectAll().where { Bookmarks.userId eq userId }
                     .orderBy(Bookmarks.createdAt to SortOrder.DESC)
                     .map { row ->
-                        mapOf(
-                            "id" to row[Posts.id].toString(),
-                            "title" to row[Posts.title],
-                            "contentSummary" to row[Posts.contentSummary],
-                            "likeCount" to row[Posts.likeCount],
-                            "cloneCount" to row[Posts.cloneCount]
+                        val postId = row[Posts.id]
+
+                        // 해당 게시글의 사진들 조회
+                        val photos = (PostPhotoMappings innerJoin TravelPhotos)
+                            .selectAll().where { PostPhotoMappings.postId eq postId }
+                            .map { photoRow ->
+                                PostPhotoResponse(
+                                    id = photoRow[TravelPhotos.id].toString(),
+                                    url = photoRow[TravelPhotos.imageUrl]
+                                )
+                            }
+
+                        // 유저 이름 조회
+                        val username = Users.selectAll().where { Users.id eq row[Posts.userId] }
+                            .map { it[Users.username] }
+                            .singleOrNull()
+
+                        PostResponse(
+                            id = postId.toString(),
+                            title = row[Posts.title],
+                            contentSummary = row[Posts.contentSummary],
+                            likeCount = row[Posts.likeCount],
+                            cloneCount = row[Posts.cloneCount],
+                            createdAt = row[Posts.createdAt].toString(),
+                            username = username,
+                            photos = photos
                         )
                     }
             }

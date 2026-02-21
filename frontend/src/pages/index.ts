@@ -1,0 +1,6 @@
+export { default as LoginPage } from './LoginPage'
+export { default as HomePage } from './HomePage'
+export { default as DiscoveryPage } from './DiscoveryPage'
+export { default as NewPage } from './NewPage'
+export { default as TravelsPage } from './TravelsPage'
+export { default as ProfilePage } from './ProfilePage'

@@ -21,8 +21,14 @@ fun Route.searchRoutes(geminiService: GeminiService) {
         get("/ai") {
             val q = call.request.queryParameters["q"] ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing query")
             
+            // SQL Injection 방지: 특수문자 이스케이프
+            val safeQuery = q.lowercase()
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+
             val dbPosts = dbQuery {
-                Posts.selectAll().where { Posts.contentSummary.lowerCase() like "%${q.lowercase()}%" }
+                Posts.selectAll().where { Posts.contentSummary.lowerCase() like "%$safeQuery%" }
                     .limit(3)
                     .map { row ->
                         mapOf(

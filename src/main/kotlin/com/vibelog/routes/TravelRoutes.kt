@@ -33,6 +33,7 @@ data class PlanItemCreateRequest(
 fun Route.travelRoutes() {
     route("/travels") {
         
+        // 여행 목록 조회
         get {
             val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val travels = dbQuery {
@@ -52,6 +53,71 @@ fun Route.travelRoutes() {
             call.respond(travels)
         }
 
+        // 활성 여행 조회 (현재 날짜 기준 진행 중인 여행)
+        get("/active") {
+            val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
+            val today = kotlinx.datetime.Clock.System.now().toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date
+            val activeTravel = dbQuery {
+                Travels.selectAll().where {
+                    (Travels.userId eq userId) and
+                    (Travels.startDate lessEq today) and
+                    (Travels.endDate greaterEq today)
+                }
+                    .orderBy(Travels.createdAt to SortOrder.DESC)
+                    .limit(1)
+                    .map { row ->
+                        TravelDTO(
+                            id = row[Travels.id].toString(),
+                            title = row[Travels.title],
+                            startDate = row[Travels.startDate].toString(),
+                            endDate = row[Travels.endDate].toString(),
+                            regionName = row[Travels.regionName],
+                            isPublic = row[Travels.isPublic]
+                        )
+                    }
+                    .singleOrNull()
+            }
+            if (activeTravel != null) {
+                call.respond(activeTravel)
+            } else {
+                call.respond(HttpStatusCode.NoContent)
+            }
+        }
+
+        // 여행 상세 조회
+        get("/{id}") {
+            val travelId = UUID.fromString(call.parameters["id"])
+            val travel = dbQuery {
+                Travels.selectAll().where { Travels.id eq travelId }
+                    .map { row ->
+                        TravelDTO(
+                            id = row[Travels.id].toString(),
+                            title = row[Travels.title],
+                            startDate = row[Travels.startDate].toString(),
+                            endDate = row[Travels.endDate].toString(),
+                            regionName = row[Travels.regionName],
+                            isPublic = row[Travels.isPublic]
+                        )
+                    }
+                    .singleOrNull()
+            }
+            if (travel != null) {
+                call.respond(travel)
+            } else {
+                call.respond(HttpStatusCode.NotFound, "Travel not found")
+            }
+        }
+
+        // 여행 삭제
+        delete("/{id}") {
+            val travelId = UUID.fromString(call.parameters["id"])
+            dbQuery {
+                Travels.deleteWhere { Travels.id eq travelId }
+            }
+            call.respond(HttpStatusCode.OK)
+        }
+
+        // 여행 생성
         post {
             val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val request = call.receive<TravelCreateRequest>()
