@@ -21,7 +21,6 @@ data class PostCreateRequest(
 fun Route.postRoutes() {
     route("/posts") {
         
-        // 피드 조회
         get {
             val posts = dbQuery {
                 Posts.selectAll()
@@ -39,7 +38,6 @@ fun Route.postRoutes() {
             call.respond(posts)
         }
 
-        // 게시글 생성 (Static Flattening 반영)
         post {
             val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val request = call.receive<PostCreateRequest>()
@@ -54,19 +52,17 @@ fun Route.postRoutes() {
                         val date = row[TravelPlanItems.date]
                         val start = row[TravelPlanItems.startTime] ?: ""
                         val end = row[TravelPlanItems.endTime] ?: ""
-                        val place = row[TravelPlanItems.placeName]
-                        "$date 일정\n- $start ~ $end : $place"
+                        val memo = row[TravelPlanItems.memo] ?: "일정"
+                        "$date 일정\n- $start ~ $end : $memo"
                     }
             }
             
-            // 2. 정적 텍스트로 변환 (AI 미사용)
             val staticSummary = if (plans.isNotEmpty()) {
                 plans.joinToString("\n")
             } else {
                 "등록된 여행 일정이 없습니다."
             }
 
-            // 3. 게시글 및 사진 매핑 저장
             val newPostId = dbQuery {
                 val postId = Posts.insert {
                     it[Posts.travelId] = travelId

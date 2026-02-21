@@ -29,20 +29,19 @@ object Travels : Table("travels") {
     override val primaryKey = PrimaryKey(id)
 }
 
-// 3. 여행 상세 계획
+// 3. 여행 상세 계획 (placeName 제거)
 object TravelPlanItems : Table("travel_plan_items") {
     val id = uuid("id").clientDefault { UUID.randomUUID() }
     val travelId = uuid("travel_id").references(Travels.id, onDelete = ReferenceOption.CASCADE)
     val date = date("date")
     val startTime = text("start_time").nullable() // HH:mm
     val endTime = text("end_time").nullable() // HH:mm
-    val placeName = text("place_name")
-    val memo = text("memo").nullable()
+    val memo = text("memo").nullable() // 이제 핵심 내용이 메모에 담김
     val orderIndex = integer("order_index").default(0)
     override val primaryKey = PrimaryKey(id)
 }
 
-// 4. 여행 사진 (Snapshot 반영)
+// 4. 여행 사진 (Snapshot)
 object TravelPhotos : Table("travel_photos") {
     val id = uuid("id").clientDefault { UUID.randomUUID() }
     val travelId = uuid("travel_id").references(Travels.id)
@@ -77,7 +76,7 @@ data class AuthRequest(val username: String)
 data class TravelDTO(val id: String, val title: String, val startDate: String, val endDate: String, val regionName: String?, val isPublic: Boolean)
 
 @Serializable
-data class PlanItemDTO(val id: String, val date: String, val startTime: String?, val endTime: String?, val placeName: String, val memo: String?)
+data class PlanItemDTO(val id: String, val date: String, val startTime: String?, val endTime: String?, val memo: String?)
 
 @Serializable
 data class SnapshotRegisterRequest(val imageUrl: String, val isSnapshot: Boolean = true)

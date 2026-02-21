@@ -25,11 +25,9 @@ fun Route.searchRoutes(apiKey: String) {
 
     route("/search") {
         
-        // AI 기반 통합 검색
         get("/ai") {
             val q = call.request.queryParameters["q"] ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing query")
             
-            // 1. 우리 DB에서 관련 게시글 검색 (단순 텍스트 검색)
             val dbPosts = dbQuery {
                 Posts.select { Posts.contentSummary ilike "%$q%" }
                     .limit(3)
@@ -42,7 +40,6 @@ fun Route.searchRoutes(apiKey: String) {
                     }
             }
 
-            // 2. Gemini에게 통합 답변 요청
             if (apiKey.isNotEmpty()) {
                 val context = if (dbPosts.isNotEmpty()) "우리 앱 유저들의 관련 여행 기록이야: $dbPosts" else ""
                 val prompt = "$context\n\n사용자의 질문: '$q'\n위의 유저 기록들과 너의 지식을 합쳐서 최고의 답변을 줘. 추천 장소와 간단한 이유를 포함해줘."
@@ -68,18 +65,15 @@ fun Route.searchRoutes(apiKey: String) {
             }
         }
 
-        // 스마트 클로닝 (AI 파싱 - 텍스트를 JSON 일정으로 변환)
         post("/clone/{id}") {
             val postId = UUID.fromString(call.parameters["id"])
             
-            // 1. 원본 게시물 데이터 조회
             val postSummary = dbQuery {
                 Posts.select { Posts.id eq postId }
                     .map { it[Posts.contentSummary] }
                     .singleOrNull()
             } ?: return@post call.respond(HttpStatusCode.NotFound, "Post not found")
             
-            // 2. AI 파싱 (텍스트 리스트 -> JSON [date, startTime, endTime, placeName, memo])
             if (apiKey.isNotEmpty() && postSummary != null) {
                 val prompt = """
                     다음 여행 요약글을 분석해서 일별 계획들을 추출해줘.
@@ -87,8 +81,7 @@ fun Route.searchRoutes(apiKey: String) {
                     - date: 'YYYY-MM-DD' 형식
                     - startTime: 'HH:mm' 형식 또는 null
                     - endTime: 'HH:mm' 형식 또는 null
-                    - placeName: 장소 이름
-                    - memo: 간단한 설명 또는 null
+                    - memo: 일정의 핵심 내용 (장소나 활동 포함)
 
                     요약글:
                     $postSummary
@@ -110,7 +103,6 @@ fun Route.searchRoutes(apiKey: String) {
                 val parsedText = body["candidates"]?.jsonArray?.get(0)?.jsonObject?.get("content")?.jsonObject?.get("parts")?.jsonArray?.get(0)?.jsonObject?.get("text")?.jsonPrimitive?.content ?: ""
                 
                 try {
-                    // AI 응답에서 JSON 추출
                     val jsonStart = parsedText.indexOf("{")
                     val jsonEnd = parsedText.lastIndexOf("}") + 1
                     val jsonResult = Json.parseToJsonElement(parsedText.substring(jsonStart, jsonEnd)).jsonObject
