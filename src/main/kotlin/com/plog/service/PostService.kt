@@ -41,11 +41,9 @@ class PostService(
             이모지도 적절히 섞어주세요.
         """.trimIndent()
 
-        val aiSummary = try {
-            geminiService.generateText(prompt)
-        } catch (e: Exception) {
-            plans.joinToString("\n")
-        }
+        // AI 요약 생성 (실패 시 일정 목록으로 대체)
+        val aiSummary = geminiService.generateText(prompt)
+            ?: plans.joinToString("\n").ifEmpty { "여행 기록" }
 
         val post = Post(
             travel = travel,

@@ -15,8 +15,12 @@ class GeminiService(
         .baseUrl("https://generativelanguage.googleapis.com")
         .build()
 
-    fun generateText(prompt: String): String {
-        if (apiKey.isEmpty()) return "AI API Key is missing"
+    /**
+     * Gemini API를 호출하여 텍스트를 생성합니다.
+     * @return 성공 시 생성된 텍스트, 실패 시 null
+     */
+    fun generateText(prompt: String): String? {
+        if (apiKey.isEmpty()) return null
 
         return try {
             val request = GeminiRequest(
@@ -33,9 +37,8 @@ class GeminiService(
                 .block()
 
             response?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                ?: "AI 답변 생성 실패"
         } catch (e: Exception) {
-            "AI 호출 중 오류 발생: ${e.message}"
+            null
         }
     }
 
@@ -54,7 +57,7 @@ class GeminiService(
             반드시 순수 JSON 형식으로만 답변해줘. (Markdown 코드 블록 제외)
         """.trimIndent()
 
-        val text = generateText(prompt)
+        val text = generateText(prompt) ?: return null
 
         return try {
             val jsonStart = text.indexOf("{")

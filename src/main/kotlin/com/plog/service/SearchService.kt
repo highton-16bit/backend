@@ -69,11 +69,8 @@ class SearchService(
             위의 유저 기록들과 너의 지식을 합쳐서 최고의 답변을 줘. 추천 장소와 간단한 이유를 포함해줘.
         """.trimIndent()
 
-        val answer = try {
-            geminiService.generateText(prompt)
-        } catch (e: Exception) {
-            "AI 응답을 생성할 수 없습니다."
-        }
+        val answer = geminiService.generateText(prompt)
+            ?: "AI 응답을 생성할 수 없습니다. 잠시 후 다시 시도해주세요."
 
         return AISearchResponse(query = query, answer = answer, relatedPosts = relatedPosts)
     }
