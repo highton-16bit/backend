@@ -86,3 +86,11 @@
 ### 3.3 인증 및 식별 (Auth)
 *   `Authorization: {username}` 헤더 기반 고유 식별.
 *   최초 1회 `POST /auth`를 통한 자동 회원가입.
+
+---
+
+## 4. 기술 스택 및 협업 가이드
+*   **Production API URL:** `https://16bit-api-production.up.railway.app` (Port: 8080)
+*   **Infrastructure:** Railway (Backend), Supabase (PostgreSQL, S3-Compatible Storage)
+*   **API Documentation:** `https://16bit-api-production.up.railway.app/docs` (Swagger UI)
+
