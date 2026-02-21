@@ -71,9 +71,7 @@ class SearchController(
         @RequestHeader("Authorization") username: String,
         @PathVariable postId: UUID
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         return try {
             val response = searchService.clonePost(user, postId)
