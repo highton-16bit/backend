@@ -1,6 +1,11 @@
 # 1. 프론트엔드 빌드 스테이지
 FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
+
+# Google Maps API Key (빌드 시 주입)
+ARG VITE_GOOGLE_MAPS_KEY
+ENV VITE_GOOGLE_MAPS_KEY=$VITE_GOOGLE_MAPS_KEY
+
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./

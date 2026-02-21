@@ -29,3 +29,5 @@ logs/
 # Local configuration
 *.local
 .env
+.env.*
+!.env.example
