@@ -1,20 +1,23 @@
 package com.vibelog.routes
 
+import com.vibelog.models.*
+import com.vibelog.plugins.dbQuery
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.http.*
-import com.vibelog.models.*
-import com.vibelog.plugins.dbQuery
 import org.jetbrains.exposed.sql.*
 import java.util.*
 
-// 헤더에서 유저를 찾아주는 공통 확장 함수
-suspend fun ApplicationCall.getUserIdFromHeader(): UUID? {
+/**
+ * Authorization 헤더에서 username을 추출하여 User ID를 반환
+ */
+suspend fun ApplicationCall.getUserId(): UUID? {
     val username = request.headers["Authorization"] ?: return null
     return dbQuery {
-        Users.selectAll().where { Users.username eq username }
+        Users.selectAll()
+            .where { Users.username eq username }
             .map { it[Users.id] }
             .singleOrNull()
     }
@@ -22,19 +25,26 @@ suspend fun ApplicationCall.getUserIdFromHeader(): UUID? {
 
 fun Route.authRoutes() {
     route("/auth") {
-        // 회원가입 & 로그인 통합 (발표용: One-Stop Auth)
+        // 회원가입 & 로그인 통합
         post {
             val request = call.receive<AuthRequest>()
-            
+
+            if (request.username.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, MessageResponse("Username is required"))
+                return@post
+            }
+
             dbQuery {
-                val existingUser = Users.selectAll().where { Users.username eq request.username }.singleOrNull()
-                if (existingUser == null) {
-                    Users.insert {
-                        it[username] = request.username
-                    }
+                val exists = Users.selectAll()
+                    .where { Users.username eq request.username }
+                    .singleOrNull()
+
+                if (exists == null) {
+                    Users.insert { it[username] = request.username }
                 }
             }
-            call.respond(HttpStatusCode.OK)
+
+            call.respond(HttpStatusCode.OK, MessageResponse("OK"))
         }
     }
 }

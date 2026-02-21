@@ -1,211 +1,230 @@
 package com.vibelog.routes
 
+import com.vibelog.models.*
+import com.vibelog.plugins.dbQuery
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.http.*
-import com.vibelog.models.*
-import com.vibelog.plugins.dbQuery
-import org.jetbrains.exposed.sql.*
-import java.util.*
+import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class TravelCreateRequest(
-    val title: String,
-    val startDate: String,
-    val endDate: String,
-    val regionName: String?,
-    val isPublic: Boolean = false
-)
-
-@Serializable
-data class PlanItemCreateRequest(
-    val date: String,
-    val startTime: String?,
-    val endTime: String?,
-    val memo: String?,
-    val orderIndex: Int = 0
-)
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import java.util.*
 
 fun Route.travelRoutes() {
     route("/travels") {
-        
-        // 여행 목록 조회
+
+        // 내 여행 목록
         get {
-            val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
+            val userId = call.getUserId()
+                ?: return@get call.respond(HttpStatusCode.Unauthorized, MessageResponse("Unauthorized"))
+
             val travels = dbQuery {
-                Travels.selectAll().where { Travels.userId eq userId }
+                Travels.selectAll()
+                    .where { Travels.userId eq userId }
                     .orderBy(Travels.createdAt to SortOrder.DESC)
-                    .map { row ->
-                        TravelDTO(
-                            id = row[Travels.id].toString(),
-                            title = row[Travels.title],
-                            startDate = row[Travels.startDate].toString(),
-                            endDate = row[Travels.endDate].toString(),
-                            regionName = row[Travels.regionName],
-                            isPublic = row[Travels.isPublic]
-                        )
-                    }
+                    .map { it.toTravelResponse() }
             }
+
             call.respond(travels)
         }
 
-        // 활성 여행 조회 (현재 날짜 기준 진행 중인 여행)
+        // 현재 진행 중인 여행
         get("/active") {
-            val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
-            val today = kotlinx.datetime.Clock.System.now().toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date
-            val activeTravel = dbQuery {
-                Travels.selectAll().where {
-                    (Travels.userId eq userId) and
-                    (Travels.startDate lessEq today) and
-                    (Travels.endDate greaterEq today)
-                }
+            val userId = call.getUserId()
+                ?: return@get call.respond(HttpStatusCode.Unauthorized, MessageResponse("Unauthorized"))
+
+            val today = Clock.System.now()
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .date
+
+            val active = dbQuery {
+                Travels.selectAll()
+                    .where {
+                        (Travels.userId eq userId) and
+                        (Travels.startDate lessEq today) and
+                        (Travels.endDate greaterEq today)
+                    }
                     .orderBy(Travels.createdAt to SortOrder.DESC)
                     .limit(1)
-                    .map { row ->
-                        TravelDTO(
-                            id = row[Travels.id].toString(),
-                            title = row[Travels.title],
-                            startDate = row[Travels.startDate].toString(),
-                            endDate = row[Travels.endDate].toString(),
-                            regionName = row[Travels.regionName],
-                            isPublic = row[Travels.isPublic]
-                        )
-                    }
+                    .map { it.toTravelResponse() }
                     .singleOrNull()
             }
-            if (activeTravel != null) {
-                call.respond(activeTravel)
+
+            if (active != null) {
+                call.respond(active)
             } else {
                 call.respond(HttpStatusCode.NoContent)
             }
         }
 
-        // 여행 상세 조회
+        // 여행 상세
         get("/{id}") {
-            val travelId = UUID.fromString(call.parameters["id"])
+            val travelId = call.parameters["id"]?.toUuidOrNull()
+                ?: return@get call.respond(HttpStatusCode.BadRequest, MessageResponse("Invalid ID"))
+
             val travel = dbQuery {
-                Travels.selectAll().where { Travels.id eq travelId }
-                    .map { row ->
-                        TravelDTO(
-                            id = row[Travels.id].toString(),
-                            title = row[Travels.title],
-                            startDate = row[Travels.startDate].toString(),
-                            endDate = row[Travels.endDate].toString(),
-                            regionName = row[Travels.regionName],
-                            isPublic = row[Travels.isPublic]
-                        )
-                    }
+                Travels.selectAll()
+                    .where { Travels.id eq travelId }
+                    .map { it.toTravelResponse() }
                     .singleOrNull()
             }
+
             if (travel != null) {
                 call.respond(travel)
             } else {
-                call.respond(HttpStatusCode.NotFound, "Travel not found")
+                call.respond(HttpStatusCode.NotFound, MessageResponse("Travel not found"))
             }
-        }
-
-        // 여행 삭제
-        delete("/{id}") {
-            val travelId = UUID.fromString(call.parameters["id"])
-            dbQuery {
-                Travels.deleteWhere { Travels.id eq travelId }
-            }
-            call.respond(HttpStatusCode.OK)
         }
 
         // 여행 생성
         post {
-            val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
+            val userId = call.getUserId()
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, MessageResponse("Unauthorized"))
+
             val request = call.receive<TravelCreateRequest>()
-            
-            val newTravelId = dbQuery {
+
+            val newId = dbQuery {
                 Travels.insert {
                     it[Travels.userId] = userId
-                    it[Travels.title] = request.title
-                    it[Travels.startDate] = LocalDate.parse(request.startDate)
-                    it[Travels.endDate] = LocalDate.parse(request.endDate)
-                    it[Travels.regionName] = request.regionName
-                    it[Travels.isPublic] = request.isPublic
+                    it[title] = request.title
+                    it[startDate] = LocalDate.parse(request.startDate)
+                    it[endDate] = LocalDate.parse(request.endDate)
+                    it[regionName] = request.regionName
+                    it[isPublic] = request.isPublic
                 } get Travels.id
             }
-            call.respond(HttpStatusCode.Created, mapOf("id" to newTravelId.toString()))
+
+            call.respond(HttpStatusCode.Created, IdResponse(newId.toString()))
         }
 
+        // 여행 삭제
+        delete("/{id}") {
+            val travelId = call.parameters["id"]?.toUuidOrNull()
+                ?: return@delete call.respond(HttpStatusCode.BadRequest, MessageResponse("Invalid ID"))
+
+            dbQuery {
+                Travels.deleteWhere { Travels.id eq travelId }
+            }
+
+            call.respond(HttpStatusCode.OK, MessageResponse("Deleted"))
+        }
+
+        // 일정 목록
         get("/{id}/plans") {
-            val travelId = UUID.fromString(call.parameters["id"])
+            val travelId = call.parameters["id"]?.toUuidOrNull()
+                ?: return@get call.respond(HttpStatusCode.BadRequest, MessageResponse("Invalid ID"))
+
             val plans = dbQuery {
-                TravelPlanItems.selectAll().where { TravelPlanItems.travelId eq travelId }
+                TravelPlanItems.selectAll()
+                    .where { TravelPlanItems.travelId eq travelId }
                     .orderBy(TravelPlanItems.date to SortOrder.ASC)
                     .orderBy(TravelPlanItems.startTime to SortOrder.ASC)
-                    .map { row ->
-                        PlanItemDTO(
-                            id = row[TravelPlanItems.id].toString(),
-                            date = row[TravelPlanItems.date].toString(),
-                            startTime = row[TravelPlanItems.startTime],
-                            endTime = row[TravelPlanItems.endTime],
-                            memo = row[TravelPlanItems.memo]
-                        )
-                    }
+                    .map { it.toPlanResponse() }
             }
+
             call.respond(plans)
         }
 
+        // 일정 추가
         post("/{id}/plans") {
-            val travelId = UUID.fromString(call.parameters["id"])
-            val request = call.receive<PlanItemCreateRequest>()
-            
-            // 시간 검증: 시작 시간이 종료 시간보다 늦으면 에러 (예: 03:00 ~ 02:00 차단)
+            val travelId = call.parameters["id"]?.toUuidOrNull()
+                ?: return@post call.respond(HttpStatusCode.BadRequest, MessageResponse("Invalid ID"))
+
+            val request = call.receive<PlanCreateRequest>()
+
+            // 시간 검증
             if (request.startTime != null && request.endTime != null) {
                 if (request.startTime > request.endTime) {
-                    return@post call.respond(HttpStatusCode.BadRequest, "Start time must be earlier than end time")
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        MessageResponse("Start time must be earlier than end time")
+                    )
                 }
             }
 
-            val newPlanId = dbQuery {
+            val newId = dbQuery {
                 TravelPlanItems.insert {
                     it[TravelPlanItems.travelId] = travelId
-                    it[TravelPlanItems.date] = LocalDate.parse(request.date)
-                    it[TravelPlanItems.startTime] = request.startTime
-                    it[TravelPlanItems.endTime] = request.endTime
-                    it[TravelPlanItems.memo] = request.memo
-                    it[TravelPlanItems.orderIndex] = request.orderIndex
+                    it[date] = LocalDate.parse(request.date)
+                    it[startTime] = request.startTime
+                    it[endTime] = request.endTime
+                    it[memo] = request.memo
+                    it[orderIndex] = request.orderIndex
                 } get TravelPlanItems.id
             }
-            call.respond(HttpStatusCode.Created, mapOf("id" to newPlanId.toString()))
+
+            call.respond(HttpStatusCode.Created, IdResponse(newId.toString()))
         }
 
+        // 일정 수정
         patch("/{id}/plans/{planId}") {
-            val planId = UUID.fromString(call.parameters["planId"])
-            val request = call.receive<PlanItemCreateRequest>()
+            val planId = call.parameters["planId"]?.toUuidOrNull()
+                ?: return@patch call.respond(HttpStatusCode.BadRequest, MessageResponse("Invalid Plan ID"))
 
+            val request = call.receive<PlanCreateRequest>()
+
+            // 시간 검증
             if (request.startTime != null && request.endTime != null) {
                 if (request.startTime > request.endTime) {
-                    return@patch call.respond(HttpStatusCode.BadRequest, "Start time must be earlier than end time")
+                    return@patch call.respond(
+                        HttpStatusCode.BadRequest,
+                        MessageResponse("Start time must be earlier than end time")
+                    )
                 }
             }
 
             dbQuery {
                 TravelPlanItems.update({ TravelPlanItems.id eq planId }) {
-                    it[TravelPlanItems.date] = LocalDate.parse(request.date)
-                    it[TravelPlanItems.startTime] = request.startTime
-                    it[TravelPlanItems.endTime] = request.endTime
-                    it[TravelPlanItems.memo] = request.memo
-                    it[TravelPlanItems.orderIndex] = request.orderIndex
+                    it[date] = LocalDate.parse(request.date)
+                    it[startTime] = request.startTime
+                    it[endTime] = request.endTime
+                    it[memo] = request.memo
+                    it[orderIndex] = request.orderIndex
                 }
             }
-            call.respond(HttpStatusCode.OK)
+
+            call.respond(HttpStatusCode.OK, MessageResponse("Updated"))
         }
 
+        // 일정 삭제
         delete("/{id}/plans/{planId}") {
-            val planId = UUID.fromString(call.parameters["planId"])
+            val planId = call.parameters["planId"]?.toUuidOrNull()
+                ?: return@delete call.respond(HttpStatusCode.BadRequest, MessageResponse("Invalid Plan ID"))
+
             dbQuery {
                 TravelPlanItems.deleteWhere { TravelPlanItems.id eq planId }
             }
-            call.respond(HttpStatusCode.OK)
+
+            call.respond(HttpStatusCode.OK, MessageResponse("Deleted"))
         }
     }
+}
+
+// Extension functions
+private fun ResultRow.toTravelResponse() = TravelResponse(
+    id = this[Travels.id].toString(),
+    title = this[Travels.title],
+    startDate = this[Travels.startDate].toString(),
+    endDate = this[Travels.endDate].toString(),
+    regionName = this[Travels.regionName],
+    isPublic = this[Travels.isPublic]
+)
+
+private fun ResultRow.toPlanResponse() = PlanResponse(
+    id = this[TravelPlanItems.id].toString(),
+    date = this[TravelPlanItems.date].toString(),
+    startTime = this[TravelPlanItems.startTime],
+    endTime = this[TravelPlanItems.endTime],
+    memo = this[TravelPlanItems.memo]
+)
+
+private fun String.toUuidOrNull(): UUID? = try {
+    UUID.fromString(this)
+} catch (e: Exception) {
+    null
 }

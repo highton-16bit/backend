@@ -4,13 +4,17 @@ val logback_version: String by project
 val exposed_version: String by project
 
 plugins {
-    kotlin("jvm") version "1.9.22"
-    id("io.ktor.plugin") version "2.3.7"
-    kotlin("plugin.serialization") version "1.9.22"
+    kotlin("jvm") version "2.1.0"
+    id("io.ktor.plugin") version "3.0.3"
+    kotlin("plugin.serialization") version "2.1.0"
 }
 
 group = "com.vibelog"
 version = "0.0.1"
+
+kotlin {
+    jvmToolchain(21)
+}
 
 application {
     mainClass.set("io.ktor.server.netty.EngineMain")

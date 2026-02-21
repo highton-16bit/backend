@@ -61,9 +61,9 @@ fun Application.configureRouting(supabaseService: SupabaseService) {
     
     routing {
         get("/") {
-            call.respond(mapOf("status" to "OK", "message" to "Welcome to Plog Ktor API!"))
+            call.respond(com.vibelog.models.MessageResponse("Welcome to Plog Ktor API!"))
         }
-        
+
         authRoutes()
         travelRoutes()
         postRoutes(geminiService)
