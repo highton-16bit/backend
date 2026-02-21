@@ -53,11 +53,11 @@ export default function PostCard({ post, onLike, onBookmark, onShare, onClone }:
       </div>
 
       {/* Image Carousel */}
-      <div className="relative">
+      <div className="relative rounded-[2rem] overflow-hidden">
         <div
           ref={carouselRef}
           onScroll={handleScroll}
-          className="aspect-[4/5] bg-slate-50 rounded-[2rem] overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide flex"
+          className="aspect-[4/5] bg-slate-50 overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide flex"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {photos.length > 0 ? (
@@ -69,7 +69,7 @@ export default function PostCard({ post, onLike, onBookmark, onShare, onClone }:
                 <img
                   src={photo.url}
                   alt={`${post.title} ${index + 1}`}
-                  className="w-full h-full object-cover rounded-[2rem]"
+                  className="w-full h-full object-cover"
                   draggable={false}
                 />
               </div>
