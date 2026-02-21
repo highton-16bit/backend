@@ -97,10 +97,10 @@ fun Route.postRoutes() {
                 val existingLike = PostLikes.selectAll().where { (PostLikes.userId eq userId) and (PostLikes.postId eq postId) }.singleOrNull()
                 if (existingLike == null) {
                     PostLikes.insert { it[PostLikes.userId] = userId; it[PostLikes.postId] = postId }
-                    Posts.update({ Posts.id eq postId }) { it[Posts.likeCount] = Posts.likeCount + 1 }
+                    Posts.update({ Posts.id eq postId }) { it[Posts.likeCount] = Posts.likeCount.plus(1) }
                 } else {
                     PostLikes.deleteWhere { (PostLikes.userId eq userId) and (PostLikes.postId eq postId) }
-                    Posts.update({ Posts.id eq postId }) { it[Posts.likeCount] = Posts.likeCount - 1 }
+                    Posts.update({ Posts.id eq postId }) { it[Posts.likeCount] = Posts.likeCount.minus(1) }
                 }
             }
             call.respond(HttpStatusCode.OK)
@@ -114,7 +114,7 @@ fun Route.postRoutes() {
             dbQuery {
                 val existingBookmark = Bookmarks.selectAll().where { (Bookmarks.userId eq userId) and (Bookmarks.postId eq postId) }.singleOrNull()
                 if (existingBookmark == null) {
-                    Bookmarks.insert { it[userId] = userId; it[postId] = postId }
+                    Bookmarks.insert { it[Bookmarks.userId] = userId; it[Bookmarks.postId] = postId }
                 } else {
                     Bookmarks.deleteWhere { (Bookmarks.userId eq userId) and (Bookmarks.postId eq postId) }
                 }

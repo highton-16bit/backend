@@ -82,6 +82,7 @@ object Bookmarks : Table("bookmarks") {
 object PostPhotoMappings : Table("post_photo_mappings") {
     val postId = uuid("post_id").references(Posts.id, onDelete = ReferenceOption.CASCADE)
     val photoId = uuid("photo_id").references(TravelPhotos.id)
+    override val primaryKey = PrimaryKey(postId, photoId)
 }
 
 // --- DTOs ---

@@ -15,8 +15,8 @@ fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 fun Application.module() {
     // 수파베이스 접속 정보 (application.conf에서 로드)
-    val supabaseUrl = environment.config.propertyOrNull("storage.jdbcURL")?.getString() ?: "" 
-    val supabaseKey = environment.config.propertyOrNull("storage.password")?.getString() ?: "" 
+    val supabaseUrl = environment.config.propertyOrNull("storage.supabaseUrl")?.getString() ?: "" 
+    val supabaseKey = environment.config.propertyOrNull("storage.supabaseKey")?.getString() ?: "" 
     val supabaseService = SupabaseService(supabaseUrl, supabaseKey)
 
     configureCORS()

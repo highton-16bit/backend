@@ -118,7 +118,7 @@ fun Route.searchRoutes(apiKey: String) {
                     
                     // 클론 횟수 증가 (성공 시에만)
                     dbQuery {
-                        Posts.update({ Posts.id eq postId }) { it[Posts.cloneCount] = Posts.cloneCount + 1 }
+                        Posts.update({ Posts.id eq postId }) { it[Posts.cloneCount] = Posts.cloneCount.plus(1) }
                     }
                     
                     call.respond(jsonResult)

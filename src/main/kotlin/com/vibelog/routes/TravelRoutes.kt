@@ -13,6 +13,15 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class TravelCreateRequest(
+    val title: String,
+    val startDate: String,
+    val endDate: String,
+    val regionName: String?,
+    val isPublic: Boolean = false
+)
+
+@Serializable
 data class PlanItemCreateRequest(
     val date: String,
     val startTime: String?,
