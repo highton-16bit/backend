@@ -36,3 +36,29 @@ export interface AISearchResponse {
     summary: string | null
   }>
 }
+
+export interface MapPin {
+  postId: string
+  title: string
+  latitude: number
+  longitude: number
+  photoUrl?: string
+}
+
+export interface SearchPostItem {
+  id: string
+  title: string
+  summary?: string
+  regionName?: string
+  latitude?: number
+  longitude?: number
+  likeCount: number
+  photoUrl?: string
+}
+
+export interface RegionSearchResponse {
+  query: string
+  regionName?: string
+  posts: SearchPostItem[]
+  mapPins: MapPin[]
+}

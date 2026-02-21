@@ -1,5 +1,5 @@
 import { apiClient } from './api'
-import type { AISearchResponse } from '../types'
+import type { RegionSearchResponse } from '../types'
 
 export interface CloneResult {
   planItems: Array<{
@@ -11,9 +11,9 @@ export interface CloneResult {
 }
 
 export const searchService = {
-  // AI 자연어 검색
-  aiSearch: async (query: string): Promise<AISearchResponse> => {
-    const response = await apiClient.get<AISearchResponse>('/search/ai', {
+  // 지역 기반 검색 (최대 10개, 첫 번째 사진 좌표 기준)
+  searchByRegion: async (query: string): Promise<RegionSearchResponse> => {
+    const response = await apiClient.get<RegionSearchResponse>('/search', {
       params: { q: query },
     })
     return response.data

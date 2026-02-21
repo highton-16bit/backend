@@ -23,7 +23,7 @@ class SearchService(
 ) {
     fun searchByRegion(query: String): RegionSearchResponse {
         val posts = postRepository.searchByRegionOrContent(query)
-            .take(20)
+            .take(10) // 최대 10개
             .map { it.toSearchItem() }
 
         val mapPins = posts
@@ -166,17 +166,15 @@ class SearchService(
 
     private fun Post.toSearchItem(): SearchPostItem {
         val firstPhoto = photos.firstOrNull()
-        val photosWithCoords = photos.filter { it.latitude != null && it.longitude != null }
-        val avgLat = photosWithCoords.mapNotNull { it.latitude }.takeIf { it.isNotEmpty() }?.average()
-        val avgLng = photosWithCoords.mapNotNull { it.longitude }.takeIf { it.isNotEmpty() }?.average()
 
         return SearchPostItem(
             id = id.toString(),
             title = title,
             summary = contentSummary,
             regionName = travel.regionName,
-            latitude = avgLat,
-            longitude = avgLng,
+            // 첫 번째 사진의 좌표 기준
+            latitude = firstPhoto?.latitude,
+            longitude = firstPhoto?.longitude,
             likeCount = likeCount,
             photoUrl = firstPhoto?.imageUrl
         )
