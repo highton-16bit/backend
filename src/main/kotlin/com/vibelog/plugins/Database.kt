@@ -21,8 +21,14 @@ fun Application.configureDatabase() {
         this.username = user
         this.password = password
         maximumPoolSize = 5
+        connectionTimeout = 30000 // 30초
+        idleTimeout = 600000
+        maxLifetime = 1800000
         isAutoCommit = false
         transactionIsolation = "TRANSACTION_READ_COMMITTED"
+        
+        // PostgreSQL 전용 최적화
+        addDataSourceProperty("reWriteBatchedInserts", "true")
         validate()
     }
 
