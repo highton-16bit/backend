@@ -1,49 +1,44 @@
-# 📸 Plog (Photo + Log) - 팀원용 개발 가이드
+# 📸 Plog (Photo + Log) 도메인 명세서
 
-> **백엔드 개발자로부터의 메시지:** 
-> "프론트엔드 개발에만 집중할 수 있도록 모든 인프라(DB, Storage, AI)를 백엔드 API 뒤로 숨겼습니다. 복잡한 수파베이스 SDK나 API Key는 잊고, 아래 가이드에 따라 REST API만 호출하세요! 😉"
-
----
-
-## 🚀 1. 백엔드 접속 정보
-- **Base URL:** `https://plog-api-production.up.railway.app` (Railway 배포 주소)
-- **API Documentation (Swagger):** `https://plog-api-production.up.railway.app/docs`
-  - 모든 API의 요청(Request)과 응답(Response) 예시를 직접 테스트해 볼 수 있습니다.
+본 문서는 **Plog** 서비스의 핵심 엔티티와 데이터 간의 관계를 정의한다. 모든 데이터는 `Authorization` 헤더의 `username`을 기반으로 식별된다.
 
 ---
 
-## 🗺️ 2. 핵심 도메인 구조
-1. **Travel (여행 대장):** 하나의 여행 단위 (예: 제주도 3박 4일). 모든 일정과 사진은 여기에 귀속됩니다.
-2. **PlanItem (일정):** 여행 내의 상세 일정 (날짜, 시간, 장소, 메모). 캘린더 뷰에 사용하세요.
-3. **Photo (사진):** 여행 중 업로드한 사진. `is_joy_mode` 플래그로 조이 모드 여부를 구분합니다.
-4. **Post (게시글):** 여행이 끝난 후 공유하는 피드. AI가 자동으로 일정을 요약해 줍니다.
+## 1. 여행 (Travel)
+*   **정의:** 서비스의 최상위 데이터 단위로, 일정과 사진의 부모 엔티티이다.
+*   **필드:** 제목(Title), 시작일(StartDate), 종료일(EndDate), 지역명(Region).
+*   **상태 값:** 시스템 시간과 시작/종료일 비교를 통해 `진행 중`, `예정`, `종료` 상태로 구분된다.
+*   **제약:** 모든 상세 일정과 사진은 반드시 하나의 여행 ID에 종속되어야 한다.
+
+## 2. 일정 (PlanItem)
+*   **정의:** 여행 기간 내에 발생하는 일일/시간별 계획 데이터이다.
+*   **필드:** 날짜(Date), 시간(Time, Optional), 장소명(PlaceName), 메모(Memo), 순서(OrderIndex).
+*   **동작:** 캘린더 뷰의 인터페이스 기반 데이터로 활용되며, 게시글 생성 시 AI 요약의 원천 데이터가 된다.
+
+## 3. 사진 (Photo)
+*   **정의:** 여행 도메인에 귀속된 이미지 리소스이다.
+*   **필드:** 이미지 URL(ImageUrl), 조이 모드 여부(isJoyMode).
+*   **구분:** 
+    *   **일반 사진:** 사용자가 직접 업로드한 이미지.
+    *   **조이 모드:** 여행 중 특정 시점에 기록된 실시간 이미지(isJoyMode: true).
+
+## 4. 게시글 (Post)
+*   **정의:** 완료된 여행을 기반으로 생성되는 소셜 공유 단위이다.
+*   **필드:** 제목(Title), 요약 내용(ContentSummary), 좋아요 수(LikeCount).
+*   **생성 로직 (AI 요약):** 여행에 등록된 모든 `PlanItem` 데이터를 백엔드에서 결합하여 AI가 생성한 텍스트 결과물을 `ContentSummary`에 저장한다.
+
+## 5. 지능형 기능 (AI Functions)
+*   **AI 하이브리드 검색 (Search):** 자연어 쿼리를 입력받아 내부 DB의 `Post` 데이터와 AI 내장 지식을 결합하여 장소 정보를 반환한다.
+*   **스마트 클로닝 (Smart Clone):** 
+    *   특정 게시글의 `ContentSummary`(텍스트)를 AI가 분석한다.
+    *   분석된 텍스트를 `Date, Time, PlaceName, Memo` 형식의 JSON 배열로 변환하여 반환한다.
+    *   변환된 데이터를 통해 새로운 여행 일정을 즉시 생성할 수 있다.
 
 ---
 
-## 🖼️ 3. 이미지 업로드 (Easy Upload)
-수파베이스 SDK를 쓸 필요가 없습니다. 백엔드가 대신 업로드해 드립니다.
-- **Endpoint:** `POST /api/v1/photos/upload` (Multipart Form-Data)
-- **Response:** `{"url": "https://supabase-storage-url/image.jpg"}`
-- **Tip:** 받은 URL을 DB 저장용 API(`POST /api/v1/travels/{id}/photos`)에 그대로 보내면 됩니다.
-
----
-
-## 🤖 4. 지능형 AI 기능 (AX)
-1. **AI 일정 요약:** 게시글 생성 시 `travel_id`만 보내면 AI가 알아서 감성적인 요약글을 만들어 본문에 넣어줍니다.
-2. **스마트 클로닝:** 타인의 게시글 ID를 보내면 AI가 그 글을 분석해서 `Date, Time, Place` 데이터로 변환해 줍니다. (내 달력에 바로 추가 가능!)
-3. **AI 통합 검색:** "전주에 있는 힙한 카페 추천해줘"라고 검색하면 DB와 AI 지식을 합쳐서 최고의 답변을 줍니다.
-
----
-
-## 🔑 5. 인증 (Seamless Login)
-- 별도의 회원가입 없이 `POST /api/v1/auth/login`에 `username`만 보내면 유니크한 `userId`가 발급됩니다.
-- 이후 모든 API 호출 시 이 `userId`를 쿼리 파라미터나 바디에 넣어주면 됩니다.
-
----
-
-## 💡 개발 팁
-- **더미 데이터:** DB에 이미 고퀄리티 여행 데이터 10개 이상을 넣어뒀습니다. `/api/v1/posts`를 호출해서 바로 피드를 그려보세요.
-- **CORS:** 모든 도메인에 대해 CORS가 허용되어 있으므로 로컬 환경에서도 바로 연동 가능합니다.
-- **Swagger 활용:** API가 안 된다면 Swagger에서 직접 데이터를 넣고 실행해 보세요. 에러 메시지가 상세히 나옵니다.
-
-**플로그와 함께 멋진 해커톤 결과물을 만들어봅시다! 🚀**
+## 6. 데이터 흐름도
+1.  **여행 생성:** `Travel` 엔티티 생성.
+2.  **계획 수립:** `Travel` ID 하위에 N개의 `PlanItem` 등록.
+3.  **기록 수집:** `Travel` ID 하위에 N개의 `Photo` 등록.
+4.  **피드 공유:** `Travel` 데이터를 기반으로 `Post` 생성 (AI 요약 자동 실행).
+5.  **정보 재활용:** 타인의 `Post`를 `Smart Clone`하여 자신의 `PlanItem`으로 변환.
