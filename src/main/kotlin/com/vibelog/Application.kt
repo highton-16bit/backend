@@ -14,10 +14,12 @@ import com.vibelog.services.SupabaseService
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 fun Application.module() {
-    // 수파베이스 접속 정보 (application.conf에서 로드)
-    val supabaseUrl = environment.config.propertyOrNull("storage.supabaseUrl")?.getString() ?: "" 
-    val supabaseKey = environment.config.propertyOrNull("storage.supabaseKey")?.getString() ?: "" 
-    val supabaseService = SupabaseService(supabaseUrl, supabaseKey)
+    // 수파베이스 S3 호환 접속 정보 (application.conf에서 로드)
+    val s3Endpoint = environment.config.propertyOrNull("storage.s3Endpoint")?.getString() ?: "" 
+    val s3Region = environment.config.propertyOrNull("storage.s3Region")?.getString() ?: "" 
+    val s3AccessKey = environment.config.propertyOrNull("storage.s3AccessKey")?.getString() ?: "" 
+    val s3SecretKey = environment.config.propertyOrNull("storage.s3SecretKey")?.getString() ?: "" 
+    val supabaseService = SupabaseService(s3Endpoint, s3Region, s3AccessKey, s3SecretKey)
 
     configureCORS()
     configureSerialization()

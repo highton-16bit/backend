@@ -42,6 +42,10 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:$logback_version")
     implementation("io.ktor:ktor-server-openapi:$ktor_version")
     implementation("io.ktor:ktor-server-swagger:$ktor_version")
+    
+    // AWS S3 SDK for Supabase S3 Protocol
+    implementation("software.amazon.awssdk:s3:2.20.162")
+
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
 }
