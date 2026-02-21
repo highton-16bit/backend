@@ -171,7 +171,9 @@ data class PhotoResponse(
 @Serializable
 data class PostPhotoResponse(
     val id: String,
-    val url: String
+    val url: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 @Serializable
@@ -183,7 +185,10 @@ data class PostResponse(
     val cloneCount: Int,
     val createdAt: String,
     val username: String?,
-    val photos: List<PostPhotoResponse>
+    val photos: List<PostPhotoResponse>,
+    val regionName: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 @Serializable
@@ -210,7 +215,12 @@ data class PhotoUploadResponse(
 data class SearchPostItem(
     val id: String,
     val title: String,
-    val summary: String?
+    val summary: String?,
+    val regionName: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val likeCount: Int = 0,
+    val photoUrl: String? = null
 )
 
 @Serializable
@@ -218,6 +228,23 @@ data class AISearchResponse(
     val query: String,
     val answer: String,
     val relatedPosts: List<SearchPostItem>
+)
+
+@Serializable
+data class RegionSearchResponse(
+    val query: String,
+    val regionName: String?,
+    val posts: List<SearchPostItem>,
+    val mapPins: List<MapPin>
+)
+
+@Serializable
+data class MapPin(
+    val postId: String,
+    val title: String,
+    val latitude: Double,
+    val longitude: Double,
+    val photoUrl: String? = null
 )
 
 @Serializable

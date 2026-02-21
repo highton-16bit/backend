@@ -186,7 +186,9 @@ fun Route.postRoutes(geminiService: GeminiService) {
 // Extension function to convert ResultRow to PostResponse
 private suspend fun ResultRow.toPostResponse(): PostResponse {
     val postId = this[Posts.id]
+    val travelId = this[Posts.travelId]
 
+    // 사진 조회 (좌표 포함)
     val photos = dbQuery {
         (PostPhotoMappings innerJoin TravelPhotos)
             .selectAll()
@@ -194,9 +196,18 @@ private suspend fun ResultRow.toPostResponse(): PostResponse {
             .map { photoRow ->
                 PostPhotoResponse(
                     id = photoRow[TravelPhotos.id].toString(),
-                    url = photoRow[TravelPhotos.imageUrl]
+                    url = photoRow[TravelPhotos.imageUrl],
+                    latitude = photoRow[TravelPhotos.latitude],
+                    longitude = photoRow[TravelPhotos.longitude]
                 )
             }
+    }
+
+    // 여행 정보 조회 (지역명)
+    val travel = dbQuery {
+        Travels.selectAll()
+            .where { Travels.id eq travelId }
+            .singleOrNull()
     }
 
     val username = dbQuery {
@@ -206,6 +217,15 @@ private suspend fun ResultRow.toPostResponse(): PostResponse {
             .singleOrNull()
     }
 
+    // 대표 좌표 계산 (사진들의 평균 좌표)
+    val photosWithCoords = photos.filter { it.latitude != null && it.longitude != null }
+    val avgLat = if (photosWithCoords.isNotEmpty()) {
+        photosWithCoords.mapNotNull { it.latitude }.average()
+    } else null
+    val avgLng = if (photosWithCoords.isNotEmpty()) {
+        photosWithCoords.mapNotNull { it.longitude }.average()
+    } else null
+
     return PostResponse(
         id = postId.toString(),
         title = this[Posts.title],
@@ -214,7 +234,10 @@ private suspend fun ResultRow.toPostResponse(): PostResponse {
         cloneCount = this[Posts.cloneCount],
         createdAt = this[Posts.createdAt].toString(),
         username = username,
-        photos = photos
+        photos = photos,
+        regionName = travel?.get(Travels.regionName),
+        latitude = avgLat,
+        longitude = avgLng
     )
 }
 
