@@ -1,88 +1,215 @@
 openapi: 3.0.3
 info:
-  title: VibeLog API (바이브로그)
-  description: 나를 가장 행복하게 하는 순간, 있는 그대로의 여행을 기록하고 발견하는 SNS 플랫폼
+  title: Plog API Documentation
+  description: "나를 가장 행복하게 하는 순간을 기록하는 지능형 여행 플랫폼 Plog의 API 명세서입니다."
   version: 1.0.0
 servers:
+  - url: https://16bit-api-production.up.railway.app
+    description: Production Server
   - url: http://localhost:8080
-    description: 로컬 개발 서버 (ngrok 사용 시 도메인 주소로 변경)
+    description: Local Development
+components:
+  securitySchemes:
+    UsernameAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "사용자 식별을 위한 유저네임 (예: daybreak)"
+security:
+  - UsernameAuth: []
+
 paths:
-  /api/v1/auth/login:
+  /auth:
     post:
-      summary: 초간단 로그인
+      summary: "로그인 및 자동 회원가입"
+      tags: [Auth]
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
               properties:
-                username:
-                  type: string
-                  example: "daybreak312"
+                username: { type: string }
       responses:
-        '200':
-          description: 로그인 성공
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  userId: { type: string, format: uuid }
-                  username: { type: string }
-                  token: { type: string }
-  /api/v1/travels:
+        200: { description: "성공" }
+
+  /travels:
     get:
-      summary: 내 여행 목록 조회
+      summary: "내 여행 목록 조회"
+      tags: [Travel]
+      responses:
+        200: { description: "성공" }
+    post:
+      summary: "새 여행 생성"
+      tags: [Travel]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                startDate: { type: string, example: "2026-02-21" }
+                endDate: { type: string, example: "2026-02-23" }
+                regionName: { type: string }
+      responses:
+        201: { description: "생성됨" }
+
+  /travels/active:
+    get:
+      summary: "현재 진행 중인 여행 정보 조회"
+      tags: [Travel]
+      responses:
+        200: { description: "성공" }
+
+  /travels/{id}/plans:
+    get:
+      summary: "특정 여행의 상세 일정 조회"
+      tags: [Travel]
       parameters:
-        - name: userId
-          in: query
+        - name: id
+          in: path
           required: true
           schema: { type: string, format: uuid }
       responses:
-        '200':
-          description: 성공
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Travel'
+        200: { description: "성공" }
     post:
-      summary: 여행 생성
+      summary: "상세 일정 추가"
+      tags: [Travel]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
       requestBody:
+        required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/TravelCreate' }
+            schema:
+              type: object
+              properties:
+                date: { type: string }
+                startTime: { type: string }
+                endTime: { type: string }
+                memo: { type: string }
       responses:
-        '201':
-          description: 생성 성공
-  /api/v1/search/ai:
+        201: { description: "생성됨" }
+
+  /posts:
     get:
-      summary: AI 기반 통합 검색
+      summary: "전체 게시글 피드 조회 (인스타그램 홈 스타일)"
+      tags: [Post]
+      responses:
+        200: { description: "성공" }
+    post:
+      summary: "게시글 작성 (Flattening 자동 적용)"
+      tags: [Post]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                travelId: { type: string, format: uuid }
+                title: { type: string }
+                photoIds:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        201: { description: "생성됨" }
+
+  /posts/{id}/like:
+    post:
+      summary: "좋아요 토글"
+      tags: [Post]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        200: { description: "성공" }
+
+  /posts/{id}/bookmark:
+    post:
+      summary: "북마크 토글"
+      tags: [Post]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        200: { description: "성공" }
+
+  /search/ai:
+    get:
+      summary: "Gemini AI 기반 자연어 검색"
+      tags: [Search]
       parameters:
         - name: q
           in: query
           required: true
           schema: { type: string }
       responses:
-        '200':
-          description: AI 답변 및 관련 포스트 반환
-components:
-  schemas:
-    Travel:
-      type: object
-      properties:
-        id: { type: string, format: uuid }
-        title: { type: string }
-        startDate: { type: string, format: date }
-        endDate: { type: string, format: date }
-        regionName: { type: string, nullable: true }
-        isPublic: { type: boolean }
-    TravelCreate:
-      type: object
-      properties:
-        title: { type: string }
-        startDate: { type: string, format: date }
-        endDate: { type: string, format: date }
-        regionName: { type: string, nullable: true }
-        isPublic: { type: boolean }
+        200: { description: "성공" }
+
+  /search/clone/{id}:
+    post:
+      summary: "스마트 클로닝 (AI 일정 파싱)"
+      tags: [Search]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        200: { description: "성공" }
+
+  /photos/upload:
+    post:
+      summary: "사진 업로드 (S3 Proxy)"
+      tags: [Photo]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        200: { description: "성공" }
+
+  /travels/{id}/photos:
+    get:
+      summary: "여행별 사진첩 조회"
+      tags: [Photo]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        200: { description: "성공" }
+    post:
+      summary: "사진첩에 사진 등록 (Snapshot 포함)"
+      tags: [Photo]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                imageUrl: { type: string }
+                isSnapshot: { type: boolean }
+      responses:
+        201: { description: "생성됨" }
