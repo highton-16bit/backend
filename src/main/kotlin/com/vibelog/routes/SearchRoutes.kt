@@ -14,7 +14,6 @@ import com.vibelog.models.*
 import com.vibelog.plugins.dbQuery
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.ilike
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import java.util.*
 import kotlinx.serialization.json.*
