@@ -68,7 +68,7 @@ fun Route.searchRoutes(apiKey: String) {
             }
         }
 
-        // 스마트 클로닝 (AI 파싱)
+        // 스마트 클로닝 (AI 파싱 - 텍스트를 JSON 일정으로 변환)
         post("/clone/{id}") {
             val postId = UUID.fromString(call.parameters["id"])
             
@@ -79,13 +79,19 @@ fun Route.searchRoutes(apiKey: String) {
                     .singleOrNull()
             } ?: return@post call.respond(HttpStatusCode.NotFound, "Post not found")
             
-            // 2. AI 파싱 (텍스트 -> JSON 일정)
+            // 2. AI 파싱 (텍스트 리스트 -> JSON [date, startTime, endTime, placeName, memo])
             if (apiKey.isNotEmpty() && postSummary != null) {
                 val prompt = """
-                    다음 여행 요약글을 읽고 일별 계획(date, time, place_name, memo)을 추출해줘. 
-                    응답은 반드시 JSON 리스트 형식이어야 해. 
-                    날짜는 '2026-03-01' 형식, 시간은 'HH:mm' 또는 null로 해줘.
-                    요약글: $postSummary
+                    다음 여행 요약글을 분석해서 일별 계획들을 추출해줘.
+                    응답은 반드시 'planItems' 라는 키를 가진 JSON 객체여야 하며, 리스트 내 각 객체는 다음 필드를 가져야 해:
+                    - date: 'YYYY-MM-DD' 형식
+                    - startTime: 'HH:mm' 형식 또는 null
+                    - endTime: 'HH:mm' 형식 또는 null
+                    - placeName: 장소 이름
+                    - memo: 간단한 설명 또는 null
+
+                    요약글:
+                    $postSummary
                 """.trimIndent()
                 
                 val response = client.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey") {
@@ -104,12 +110,13 @@ fun Route.searchRoutes(apiKey: String) {
                 val parsedText = body["candidates"]?.jsonArray?.get(0)?.jsonObject?.get("content")?.jsonObject?.get("parts")?.jsonArray?.get(0)?.jsonObject?.get("text")?.jsonPrimitive?.content ?: ""
                 
                 try {
-                    val jsonStart = parsedText.indexOf("[")
-                    val jsonEnd = parsedText.lastIndexOf("]") + 1
-                    val jsonArray = Json.parseToJsonElement(parsedText.substring(jsonStart, jsonEnd)).jsonArray
-                    call.respond(mapOf("parsed_plans" to jsonArray))
+                    // AI 응답에서 JSON 추출
+                    val jsonStart = parsedText.indexOf("{")
+                    val jsonEnd = parsedText.lastIndexOf("}") + 1
+                    val jsonResult = Json.parseToJsonElement(parsedText.substring(jsonStart, jsonEnd)).jsonObject
+                    call.respond(jsonResult)
                 } catch (e: Exception) {
-                    call.respond(HttpStatusCode.InternalServerError, "Failed to parse travel plan")
+                    call.respond(HttpStatusCode.InternalServerError, "Failed to parse travel plan via AI")
                 }
             } else {
                 call.respond(HttpStatusCode.BadRequest, "AI parsing unavailable")

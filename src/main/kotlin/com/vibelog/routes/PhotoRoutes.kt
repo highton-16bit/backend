@@ -42,7 +42,7 @@ fun Route.photoRoutes(supabaseService: SupabaseService) {
         }
     }
 
-    // 여행별 사진 관리 (Header 인증 적용)
+    // 여행별 사진 관리 (Snapshot 반영)
     route("/travels/{id}/photos") {
         get {
             val travelId = UUID.fromString(call.parameters["id"])
@@ -52,7 +52,7 @@ fun Route.photoRoutes(supabaseService: SupabaseService) {
                         mapOf(
                             "id" to row[TravelPhotos.id].toString(),
                             "imageUrl" to row[TravelPhotos.imageUrl],
-                            "isJoyMode" to row[TravelPhotos.isJoyMode]
+                            "isSnapshot" to row[TravelPhotos.isSnapshot]
                         )
                     }
             }
@@ -61,13 +61,13 @@ fun Route.photoRoutes(supabaseService: SupabaseService) {
 
         post {
             val travelId = UUID.fromString(call.parameters["id"])
-            val request = call.receive<PhotoRegisterRequest>()
+            val request = call.receive<SnapshotRegisterRequest>()
             
             val photoId = dbQuery {
                 TravelPhotos.insert {
                     it[TravelPhotos.travelId] = travelId
                     it[TravelPhotos.imageUrl] = request.imageUrl
-                    it[TravelPhotos.isJoyMode] = request.isJoyMode
+                    it[TravelPhotos.isSnapshot] = request.isSnapshot
                 } get TravelPhotos.id
             }
             call.respond(HttpStatusCode.Created, mapOf("id" to photoId.toString()))

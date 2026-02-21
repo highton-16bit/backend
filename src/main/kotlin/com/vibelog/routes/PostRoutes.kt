@@ -5,24 +5,20 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.http.*
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.serialization.kotlinx.json.*
 import com.vibelog.models.*
 import com.vibelog.plugins.dbQuery
 import org.jetbrains.exposed.sql.*
 import java.util.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.Serializable
 
-fun Route.postRoutes(apiKey: String) {
-    val client = HttpClient {
-        install(ContentNegotiation) {
-            json()
-        }
-    }
+@Serializable
+data class PostCreateRequest(
+    val travelId: String,
+    val title: String,
+    val photoIds: List<String>
+)
 
+fun Route.postRoutes() {
     route("/posts") {
         
         // 피드 조회
@@ -43,56 +39,40 @@ fun Route.postRoutes(apiKey: String) {
             call.respond(posts)
         }
 
-        // 게시글 생성 (AI 요약 포함)
+        // 게시글 생성 (Static Flattening 반영)
         post {
             val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val request = call.receive<PostCreateRequest>()
             val travelId = UUID.fromString(request.travelId)
             
-            // 1. 여행 계획 데이터 조회
+            // 1. 여행 일정 데이터 조회
             val plans = dbQuery {
                 TravelPlanItems.select { TravelPlanItems.travelId eq travelId }
                     .orderBy(TravelPlanItems.date to SortOrder.ASC)
+                    .orderBy(TravelPlanItems.startTime to SortOrder.ASC)
                     .map { row ->
-                        mapOf(
-                            "date" to row[TravelPlanItems.date].toString(),
-                            "placeName" to row[TravelPlanItems.placeName],
-                            "memo" to row[TravelPlanItems.memo]
-                        )
+                        val date = row[TravelPlanItems.date]
+                        val start = row[TravelPlanItems.startTime] ?: ""
+                        val end = row[TravelPlanItems.endTime] ?: ""
+                        val place = row[TravelPlanItems.placeName]
+                        "$date 일정\n- $start ~ $end : $place"
                     }
             }
             
-            // 2. AI 요약 (Gemini)
-            var summary: String? = null
-            if (apiKey.isNotEmpty() && plans.isNotEmpty()) {
-                try {
-                    val prompt = "다음은 한 여행의 일정 데이터야. 이 일정들을 기반으로 블로그 포스팅처럼 감성적이고 읽기 좋게 요약해줘: $plans"
-                    val response = client.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey") {
-                        contentType(ContentType.Application.JSON)
-                        setBody(buildJsonObject {
-                            putJsonArray("contents") {
-                                addJsonObject {
-                                    putJsonArray("parts") {
-                                        addJsonObject { put("text", prompt) }
-                                    }
-                                }
-                            }
-                        })
-                    }
-                    val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-                    summary = body["candidates"]?.jsonArray?.get(0)?.jsonObject?.get("content")?.jsonObject?.get("parts")?.jsonArray?.get(0)?.jsonObject?.get("text")?.jsonPrimitive?.content
-                } catch (e: Exception) {
-                    println("AI 요약 실패: ${e.message}")
-                }
+            // 2. 정적 텍스트로 변환 (AI 미사용)
+            val staticSummary = if (plans.isNotEmpty()) {
+                plans.joinToString("\n")
+            } else {
+                "등록된 여행 일정이 없습니다."
             }
 
-            // 3. 게시글 저장
+            // 3. 게시글 및 사진 매핑 저장
             val newPostId = dbQuery {
                 val postId = Posts.insert {
                     it[Posts.travelId] = travelId
                     it[Posts.userId] = userId
                     it[Posts.title] = request.title
-                    it[Posts.contentSummary] = summary
+                    it[Posts.contentSummary] = staticSummary
                 } get Posts.id
                 
                 request.photoIds.forEach { photoId ->
@@ -104,7 +84,7 @@ fun Route.postRoutes(apiKey: String) {
                 postId
             }
             
-            call.respond(HttpStatusCode.Created, mapOf("id" to newPostId.toString(), "summary" to summary))
+            call.respond(HttpStatusCode.Created, mapOf("id" to newPostId.toString(), "summary" to staticSummary))
         }
     }
 }
