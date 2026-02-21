@@ -1,179 +1,130 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Home, Compass, PlusSquare, Image, User, Camera, Heart, Bookmark, MapPin, Calendar, Upload, Loader2, MoreHorizontal, Share2 } from 'lucide-react'
+import { 
+  Home, Compass, PlusSquare, Image, User, Camera, Heart, Bookmark, MapPin, Calendar, 
+  Upload, Loader2, MoreHorizontal, Share2, Search, Send, Clock, ChevronRight, X, Check, Plus
+} from 'lucide-react'
 
 // Backend URL
 const API_URL = 'https://16bit-api-production.up.railway.app'
 
+// --- Types ---
+type Tab = 'home' | 'discovery' | 'new' | 'travels' | 'profile'
+
 export default function App() {
   const [user, setUser] = useState<string | null>(localStorage.getItem('plog_user'))
-  const [activeTab, setActiveTab] = useState('home')
+  const [activeTab, setActiveTab] = useState<Tab>('home')
+  const [isLoading, setIsLoading] = useState(false)
+  
+  // Data States
   const [activeTravel, setActiveTravel] = useState<any>(null)
   const [feed, setFeed] = useState<any[]>([])
   const [discoveryPosts, setDiscoveryPosts] = useState<any[]>([])
   const [myTravels, setMyTravels] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<any[]>([])
 
   useEffect(() => {
     if (user) {
       axios.defaults.headers.common['Authorization'] = user
-      fetchAllData()
+      refreshData()
     }
-  }, [user])
+  }, [user, activeTab])
 
-  const fetchAllData = async () => {
+  const refreshData = async () => {
     setIsLoading(true)
     try {
-      const travelRes = await axios.get(`${API_URL}/travels/active`)
-      setActiveTravel(travelRes.data)
-      const feedRes = await axios.get(`${API_URL}/posts`)
-      setFeed(feedRes.data)
-      const myTravelsRes = await axios.get(`${API_URL}/travels`)
-      setMyTravels(myTravelsRes.data)
+      if (activeTab === 'home') {
+        const [at, f] = await Promise.all([
+          axios.get(`${API_URL}/travels/active`),
+          axios.get(`${API_URL}/posts`)
+        ])
+        setActiveTravel(at.data)
+        setFeed(f.data)
+      } else if (activeTab === 'discovery') {
+        const res = await axios.get(`${API_URL}/posts`)
+        setDiscoveryPosts(res.data)
+      } else if (activeTab === 'travels') {
+        const res = await axios.get(`${API_URL}/travels`)
+        setMyTravels(res.data)
+      } else if (activeTab === 'profile') {
+        // Bookmarks (실제 API 명세엔 없지만 피드 필터링 등으로 구현 가능)
+        const res = await axios.get(`${API_URL}/posts`) 
+        setBookmarkedPosts(res.data.slice(0, 2)) // Mocking for now
+      }
     } catch (e) {
-      console.error("Data fetch error", e)
+      console.error(e)
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const fetchDiscovery = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/posts`)
-      setDiscoveryPosts(res.data)
-    } catch (e) { console.error(e) }
   }
 
   if (!user) return <LoginScreen onLogin={setUser} />
 
   return (
     <div className="flex flex-col h-screen max-w-md mx-auto bg-gray-50 shadow-2xl relative overflow-hidden font-sans text-slate-900">
-      {/* Top Header */}
-      <header className="px-6 py-4 flex justify-between items-center bg-white/80 backdrop-blur-lg sticky top-0 z-30 border-b border-gray-100">
-        <h1 className="text-2xl font-black text-blue-600 tracking-tighter italic select-none">Plog</h1>
-        <div className="flex items-center gap-4 text-slate-600">
-          {isLoading && <Loader2 className="animate-spin text-blue-500" size={20} />}
-          <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200">
-            <User size={18} />
+      {/* Header */}
+      <header className="px-6 py-4 flex justify-between items-center bg-white/90 backdrop-blur-xl sticky top-0 z-30 border-b border-gray-100">
+        <h1 className="text-2xl font-black text-blue-600 tracking-tighter italic">Plog</h1>
+        <div className="flex items-center gap-3">
+          {isLoading && <Loader2 className="animate-spin text-blue-500" size={18} />}
+          <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100">
+            <User size={16} className="text-blue-600" />
           </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <main className="flex-1 overflow-y-auto pb-24 scrollbar-hide">
-        {activeTab === 'home' && <HomeTab activeTravel={activeTravel} feed={feed} />}
-        {activeTab === 'discovery' && <DiscoveryTab posts={discoveryPosts} onRefresh={fetchDiscovery} />}
-        {activeTab === 'new' && <NewTab activeTravelId={activeTravel?.id} onComplete={() => {setActiveTab('home'); fetchAllData();}} />}
-        {activeTab === 'travels' && <TravelsTab travels={myTravels} />}
+        {activeTab === 'home' && <HomeTab activeTravel={activeTravel} feed={feed} onRefresh={refreshData} />}
+        {activeTab === 'discovery' && <DiscoveryTab posts={discoveryPosts} onRefresh={refreshData} />}
+        {activeTab === 'new' && <NewTab myTravels={myTravels} onComplete={() => setActiveTab('home')} />}
+        {activeTab === 'travels' && <TravelsTab travels={myTravels} onRefresh={refreshData} />}
+        {activeTab === 'profile' && <ProfileTab user={user} bookmarks={bookmarkedPosts} onLogout={() => {localStorage.removeItem('plog_user'); window.location.reload();}} />}
       </main>
 
-      {/* Bottom Floating Navigation */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-[380px] bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-2xl flex justify-around items-center p-3 z-40 border border-white/10">
-        <NavButton icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => {setActiveTab('home'); fetchAllData();}} />
-        <NavButton icon={<Compass />} label="Explore" active={activeTab === 'discovery'} onClick={() => {setActiveTab('discovery'); fetchDiscovery();}} />
-        <NavButton icon={<PlusSquare />} label="Record" active={activeTab === 'new'} onClick={() => setActiveTab('new')} />
-        <NavButton icon={<Image />} label="Memories" active={activeTab === 'travels'} onClick={() => {setActiveTab('travels'); fetchAllData();}} />
-        <button onClick={() => {localStorage.removeItem('plog_user'); window.location.reload();}} className="flex flex-col items-center gap-1 text-red-400/80 p-2">
-          <User size={22} />
-          <span className="text-[9px] font-bold uppercase tracking-tight">Logout</span>
-        </button>
+      {/* Bottom Nav (5 Tabs per Spec) */}
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-[400px] bg-slate-900/95 backdrop-blur-2xl rounded-[2rem] shadow-2xl flex justify-around items-center p-2 z-40 border border-white/10">
+        <NavButton icon={<Home />} label="Home" active={activeTab === 'home'} onClick={() => setActiveTab('home')} />
+        <NavButton icon={<Compass />} label="Explore" active={activeTab === 'discovery'} onClick={() => setActiveTab('discovery')} />
+        <NavButton icon={<PlusSquare />} label="New" active={activeTab === 'new'} onClick={() => setActiveTab('new')} />
+        <NavButton icon={<Image />} label="Travels" active={activeTab === 'travels'} onClick={() => setActiveTab('travels')} />
+        <NavButton icon={<User />} label="Profile" active={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
       </nav>
     </div>
   )
 }
 
-function HomeTab({ activeTravel, feed }: any) {
+// --- Tab Components ---
+
+function HomeTab({ activeTravel, feed, onRefresh }: any) {
   return (
-    <div className="animate-in fade-in duration-500">
-      {/* Hero Active Journey */}
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
       <section className="p-6">
-        <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 rounded-[2.5rem] p-8 text-white shadow-xl shadow-blue-200 relative overflow-hidden group">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] p-8 text-white shadow-xl shadow-blue-200 relative overflow-hidden group">
           <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-300 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
-              </span>
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-100">Live Journey</span>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-100">Active Now</span>
             </div>
-            <h2 className="text-3xl font-black mb-2 tracking-tight leading-tight">
-              {activeTravel?.title || '어디로 떠날까요?'}
+            <h2 className="text-3xl font-black mb-2 tracking-tight">
+              {activeTravel?.title || '여행을 떠나보세요'}
             </h2>
-            <div className="flex items-center gap-2 text-blue-50 font-medium bg-black/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
+            <div className="flex items-center gap-2 text-blue-100/90 font-bold bg-white/10 w-fit px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10">
               <MapPin size={14} /> 
-              <span className="text-sm">{activeTravel?.regionName || '나만의 여행을 시작해보세요'}</span>
+              <span className="text-xs">{activeTravel?.regionName || '나만의 기록을 시작할 시간'}</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Detail Feed Section */}
       <section className="px-6 pb-10 space-y-10">
-        <div className="flex justify-between items-end px-1">
-          <h3 className="text-2xl font-black tracking-tighter">Recent Logs</h3>
-          <span className="text-blue-600 font-bold text-xs uppercase tracking-widest cursor-pointer">View All</span>
+        <div className="flex justify-between items-center px-1">
+          <h3 className="text-2xl font-black tracking-tighter">Moments</h3>
+          <button onClick={onRefresh} className="text-blue-600 font-black text-[10px] uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-full">Refresh</button>
         </div>
         
-        {feed.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-slate-200">
-            <Image className="mx-auto text-slate-300 mb-4" size={48} />
-            <p className="text-slate-400 font-bold">아직 공유된 기록이 없습니다.</p>
-          </div>
-        )}
-
         {feed.map((post: any) => (
-          <div key={post.id} className="bg-white rounded-[2.5rem] p-4 shadow-sm border border-gray-50 space-y-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center font-bold text-white shadow-inner">
-                  {post.username?.charAt(0).toUpperCase() || 'P'}
-                </div>
-                <div>
-                   <p className="font-bold text-sm text-slate-800">{post.username || 'Plog User'}</p>
-                   <p className="text-[10px] text-blue-500 font-black uppercase tracking-tighter">Verified Explorer</p>
-                </div>
-              </div>
-              <MoreHorizontal className="text-slate-400" size={20} />
-            </div>
-
-            <div className="aspect-[4/5] bg-slate-100 rounded-[2rem] overflow-hidden relative group">
-               {post.photos && post.photos.length > 0 ? (
-                 <img src={post.photos[0].url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="post" />
-               ) : (
-                 <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 gap-2">
-                    <Image size={48} strokeWidth={1} />
-                    <span className="text-xs italic">No visual moments captured</span>
-                 </div>
-               )}
-            </div>
-
-            <div className="px-2 space-y-4">
-              <div className="flex justify-between items-center">
-                <div className="flex gap-6 items-center">
-                  <button className="flex items-center gap-1.5 text-slate-700 hover:text-red-500 transition-colors">
-                    <Heart size={24} className="fill-current text-transparent hover:text-red-500" /> 
-                    <span className="text-xs font-black">{post.likeCount}</span>
-                  </button>
-                  <button className="flex items-center gap-1.5 text-slate-700 hover:text-blue-500 transition-colors">
-                    <PlusSquare size={24} /> 
-                    <span className="text-xs font-black">{post.cloneCount}</span>
-                  </button>
-                  <Share2 size={22} className="text-slate-700" />
-                </div>
-                <Bookmark size={24} className="text-slate-700" />
-              </div>
-
-              <div>
-                <h4 className="font-black text-xl mb-2 text-slate-900 leading-tight">{post.title}</h4>
-                <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100/50">
-                   <p className="text-slate-600 text-xs leading-relaxed whitespace-pre-wrap line-clamp-4 font-medium italic">
-                     "{post.contentSummary}"
-                   </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <PostCard key={post.id} post={post} />
         ))}
       </section>
     </div>
@@ -181,127 +132,59 @@ function HomeTab({ activeTravel, feed }: any) {
 }
 
 function DiscoveryTab({ posts, onRefresh }: any) {
-  useEffect(() => { onRefresh() }, [])
-  return (
-    <div className="p-6 animate-in slide-in-from-right-10 duration-500">
-       <div className="mb-8 space-y-1">
-         <h2 className="text-3xl font-black italic tracking-tighter text-slate-900">Discovery</h2>
-         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Find your next happiness</p>
-       </div>
-       <div className="grid grid-cols-3 gap-2">
-        {posts.map((post: any) => (
-          <div key={post.id} className="aspect-square bg-white rounded-2xl overflow-hidden active:scale-95 transition-all shadow-sm border border-gray-100 hover:shadow-md">
-            {post.photos && post.photos.length > 0 ? (
-              <img src={post.photos[0].url} className="w-full h-full object-cover" alt="thumb" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-200"><Image size={24} /></div>
-            )}
-          </div>
-        ))}
-        {posts.length === 0 && [1,2,3,4,5,6].map(i => (
-          <div key={i} className="aspect-square bg-gray-100 rounded-2xl animate-pulse"></div>
-        ))}
-      </div>
-    </div>
-  )
-}
+  const [searchQuery, setSearchQuery] = useState('')
+  const [aiResponse, setAiResponse] = useState<any>(null)
+  const [isSearching, setIsSearching] = useState(false)
 
-function NewTab({ activeTravelId, onComplete }: any) {
-  const [isUploading, setIsUploading] = useState(false)
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !activeTravelId) {
-      if (!activeTravelId) alert("진행 중인 여행이 없습니다!")
-      return
-    }
-
-    setIsUploading(true)
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('travelId', activeTravelId)
-    formData.append('isSnapshot', 'true')
-
+  const handleSearch = async () => {
+    if (!searchQuery) return
+    setIsSearching(true)
     try {
-      await axios.post(`${API_URL}/photos/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      alert("Snapshot Recorded! ✨")
-      onComplete()
-    } catch (err) {
-      alert("Upload Failed")
-    } finally {
-      setIsUploading(false)
-    }
+      const res = await axios.get(`${API_URL}/search/ai?q=${encodeURIComponent(searchQuery)}`)
+      setAiResponse(res.data)
+    } catch (e) { console.error(e) } finally { setIsSearching(false) }
   }
 
   return (
-    <div className="p-8 flex flex-col items-center justify-center min-h-[80vh] space-y-12 animate-in zoom-in-95 duration-500">
-      <div className="relative">
-        <div className="w-24 h-24 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-blue-200 rotate-12">
-          <Camera size={48} />
+    <div className="p-6 space-y-8 animate-in slide-in-from-right-4 duration-500">
+      <div className="space-y-4">
+        <h2 className="text-3xl font-black italic tracking-tighter">Explore</h2>
+        <div className="relative">
+          <input 
+            className="w-full p-5 bg-white rounded-[1.5rem] border border-gray-100 shadow-sm focus:ring-2 focus:ring-blue-500 transition-all pl-12 font-bold text-sm"
+            placeholder="제주도 감성 숙소 추천해줘"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+          />
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <button onClick={handleSearch} className="absolute right-3 top-1/2 -translate-y-1/2 bg-blue-600 text-white p-2.5 rounded-xl shadow-lg active:scale-90 transition-transform">
+            {isSearching ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          </button>
         </div>
-        <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center text-white border-4 border-white">
-          <PlusSquare size={20} />
+      </div>
+
+      {aiResponse && (
+        <div className="bg-blue-600 text-white p-6 rounded-[2rem] shadow-xl shadow-blue-100 space-y-3 animate-in zoom-in-95">
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-white/20 rounded-lg"><User size={14} /></div>
+            <span className="text-[10px] font-black uppercase tracking-widest">Plog AI Discovery</span>
+          </div>
+          <p className="text-sm font-bold leading-relaxed whitespace-pre-wrap">"{aiResponse.answer || aiResponse.summary}"</p>
+          {aiResponse.recommendations && (
+            <div className="flex gap-2 overflow-x-auto py-2">
+              {aiResponse.recommendations.map((rec: any, i: number) => (
+                <div key={i} className="bg-white/10 px-3 py-1 rounded-full text-[10px] whitespace-nowrap border border-white/20">#{rec}</div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-black tracking-tight">Record Vibe</h2>
-        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em]">Capture the moment of joy</p>
-      </div>
-
-      <div className="w-full space-y-6">
-        <label className={`w-full p-12 border-4 border-dashed rounded-[3.5rem] transition-all flex flex-col items-center gap-6 cursor-pointer active:scale-95 shadow-inner ${isUploading ? 'bg-slate-50 border-slate-200' : 'bg-white border-blue-100 hover:border-blue-300 hover:bg-blue-50/30'}`}>
-          <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={isUploading} />
-          {isUploading ? <Loader2 size={56} className="animate-spin text-blue-500" /> : <Upload size={56} className="text-blue-600" />}
-          <div className="text-center">
-            <span className="block font-black text-slate-800 text-xl">Snapshot</span>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Automatic GPS & Time Analysis</span>
-          </div>
-        </label>
-        
-        <button className="w-full py-6 rounded-[2.5rem] bg-slate-100 text-slate-500 font-black text-sm flex items-center justify-center gap-3 hover:bg-slate-200 transition-colors">
-          <Calendar size={20} />
-          Plan New Adventure
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function TravelsTab({ travels }: any) {
-  return (
-    <div className="p-6 space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-500">
-      <div className="space-y-1">
-        <h2 className="text-3xl font-black italic tracking-tighter text-slate-900">Memories</h2>
-        <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] px-1">Your Journey History</p>
-      </div>
-      
-      <div className="grid grid-cols-1 gap-8">
-        {travels.length === 0 && (
-          <div className="text-center py-20">
-            <p className="text-slate-300 font-black italic">No memories saved yet.</p>
-          </div>
-        )}
-        {travels.map((travel: any) => (
-          <div key={travel.id} className="relative aspect-[16/10] rounded-[2.5rem] overflow-hidden group shadow-lg shadow-slate-200 active:scale-[0.98] transition-all">
-             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/20 to-transparent z-10"></div>
-             <div className="absolute inset-0 bg-blue-100 group-hover:scale-110 transition-transform duration-1000 flex items-center justify-center">
-                <Image className="text-blue-200" size={64} />
-             </div>
-             <div className="absolute bottom-8 left-8 z-20 text-white space-y-1">
-                <h4 className="text-2xl font-black tracking-tight">{travel.title}</h4>
-                <div className="flex items-center gap-2 opacity-80">
-                  <Calendar size={12} className="text-blue-400" />
-                  <span className="text-[10px] font-black tracking-widest uppercase">{travel.startDate} — {travel.endDate}</span>
-                </div>
-             </div>
-             <div className="absolute top-8 right-8 z-20">
-                <span className="bg-blue-600/90 backdrop-blur-md text-[9px] font-black px-4 py-2 rounded-full text-white uppercase tracking-widest border border-white/20 shadow-lg">
-                  {travel.regionName || 'Globe'}
-                </span>
-             </div>
+      <div className="grid grid-cols-3 gap-2">
+        {posts.map((post: any) => (
+          <div key={post.id} className="aspect-square bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:scale-105 transition-transform active:scale-95">
+            {post.photos?.[0] ? <img src={post.photos[0].url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-100" />}
           </div>
         ))}
       </div>
@@ -309,48 +192,358 @@ function TravelsTab({ travels }: any) {
   )
 }
 
+function NewTab({ myTravels, onComplete }: any) {
+  const [mode, setMode] = useState<'create_travel' | 'share_post' | null>(null)
+  
+  // Create Travel State
+  const [title, setTitle] = useState('')
+  const [region, setRegion] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  // Share Post State
+  const [selectedTravelId, setSelectedTravelId] = useState('')
+  const [postTitle, setPostTitle] = useState('')
+  const [travelPhotos, setTravelPhotos] = useState<any[]>([])
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
+
+  const handleCreateTravel = async () => {
+    try {
+      await axios.post(`${API_URL}/travels`, { title, regionName: region, startDate, endDate })
+      alert("신규 여행이 생성되었습니다! ✨")
+      onComplete()
+    } catch (e) { alert("생성 실패") }
+  }
+
+  const handleTravelSelect = async (id: string) => {
+    setSelectedTravelId(id)
+    try {
+      const res = await axios.get(`${API_URL}/travels/${id}/photos`)
+      setTravelPhotos(res.data)
+    } catch (e) { console.error(e) }
+  }
+
+  const handleSharePost = async () => {
+    try {
+      await axios.post(`${API_URL}/posts`, { 
+        travelId: selectedTravelId, 
+        title: postTitle, 
+        photoIds: selectedPhotoIds 
+      })
+      alert("게시글이 공유되었습니다! (AI 일정이 자동 포함됩니다)")
+      onComplete()
+    } catch (e) { alert("공유 실패") }
+  }
+
+  if (mode === 'create_travel') return (
+    <div className="p-8 space-y-8 animate-in slide-in-from-bottom-4">
+      <button onClick={() => setMode(null)} className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase"><X size={16}/> Back</button>
+      <h2 className="text-3xl font-black italic">Start New Journey</h2>
+      <div className="space-y-4">
+        <Input label="Title" value={title} onChange={setTitle} placeholder="제주도 힐링 여행" />
+        <Input label="Region" value={region} onChange={setRegion} placeholder="제주, 서귀포" />
+        <div className="grid grid-cols-2 gap-4">
+          <Input label="Start" value={startDate} onChange={setStartDate} placeholder="2026-02-21" />
+          <Input label="End" value={endDate} onChange={setEndDate} placeholder="2026-02-23" />
+        </div>
+        <button onClick={handleCreateTravel} className="w-full bg-blue-600 text-white p-5 rounded-[1.5rem] font-black text-lg shadow-xl shadow-blue-100 active:scale-95 transition-all mt-4">Create Journey</button>
+      </div>
+    </div>
+  )
+
+  if (mode === 'share_post') return (
+    <div className="p-8 space-y-8 animate-in slide-in-from-bottom-4">
+      <button onClick={() => setMode(null)} className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase"><X size={16}/> Back</button>
+      <h2 className="text-3xl font-black italic">Share Memory</h2>
+      <div className="space-y-6">
+        <div>
+          <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 px-1">Select Travel</label>
+          <select 
+            className="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm shadow-sm"
+            onChange={e => handleTravelSelect(e.target.value)}
+          >
+            <option value="">여행 선택...</option>
+            {myTravels.map((t: any) => <option key={t.id} value={t.id}>{t.title}</option>)}
+          </select>
+        </div>
+
+        <Input label="Post Title" value={postTitle} onChange={setPostTitle} placeholder="이번 여행의 한 줄 평" />
+
+        {travelPhotos.length > 0 && (
+          <div>
+            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 px-1">Select Photos ({selectedPhotoIds.length})</label>
+            <div className="grid grid-cols-4 gap-2">
+              {travelPhotos.map((p: any) => (
+                <div 
+                  key={p.id} 
+                  onClick={() => setSelectedPhotoIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])}
+                  className={`aspect-square rounded-xl overflow-hidden border-4 transition-all relative cursor-pointer ${selectedPhotoIds.includes(p.id) ? 'border-blue-500 scale-90 shadow-lg' : 'border-transparent'}`}
+                >
+                  <img src={p.imageUrl} className="w-full h-full object-cover" />
+                  {selectedPhotoIds.includes(p.id) && <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full p-0.5"><Check size={10}/></div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button onClick={handleSharePost} className="w-full bg-blue-600 text-white p-5 rounded-[1.5rem] font-black text-lg shadow-xl shadow-blue-100 active:scale-95 transition-all mt-4">Post with AI Summary</button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="p-12 flex flex-col items-center justify-center min-h-[80vh] space-y-16 animate-in zoom-in-95">
+      <div className="text-center space-y-2">
+        <h2 className="text-4xl font-black tracking-tighter italic">What's Next?</h2>
+        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.3em]">Build your happiness archive</p>
+      </div>
+      <div className="w-full grid grid-cols-1 gap-6">
+        <SelectionButton 
+          icon={<Calendar size={32} />} 
+          title="New Journey" 
+          desc="새로운 여행 계획 등록" 
+          color="bg-blue-600"
+          onClick={() => setMode('create_travel')}
+        />
+        <SelectionButton 
+          icon={<Share2 size={32} />} 
+          title="Share Memory" 
+          desc="AI 기반 게시글 공유" 
+          color="bg-indigo-600"
+          onClick={() => setMode('share_post')}
+        />
+      </div>
+    </div>
+  )
+}
+
+function TravelsTab({ travels, onRefresh }: any) {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [plans, setPlans] = useState<any[]>([])
+  const [photos, setPhotos] = useState<any[]>([])
+  const [activeSubTab, setActiveSubTab] = useState<'gallery' | 'plan'>('gallery')
+
+  // Create Plan State
+  const [newPlanMemo, setNewPlanMemo] = useState('')
+  const [newPlanDate, setNewPlanDate] = useState('')
+
+  const handleDetail = async (id: string) => {
+    setSelectedId(id)
+    try {
+      const [pl, ph] = await Promise.all([
+        axios.get(`${API_URL}/travels/${id}/plans`),
+        axios.get(`${API_URL}/travels/${id}/photos`)
+      ])
+      setPlans(pl.data)
+      setPhotos(ph.data)
+    } catch (e) { console.error(e) }
+  }
+
+  const handleAddPlan = async () => {
+    if (!newPlanMemo || !selectedId) return
+    try {
+      await axios.post(`${API_URL}/travels/${selectedId}/plans`, { date: newPlanDate, memo: newPlanMemo })
+      setNewPlanMemo('')
+      handleDetail(selectedId)
+    } catch (e) { alert("일정 추가 실패") }
+  }
+
+  if (selectedId) return (
+    <div className="p-6 space-y-8 animate-in slide-in-from-right-4">
+      <button onClick={() => setSelectedId(null)} className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase"><X size={16}/> Back</button>
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-black tracking-tight">{travels.find((t: any) => t.id === selectedId)?.title}</h2>
+      </div>
+      
+      <div className="flex bg-slate-100 p-1.5 rounded-2xl w-fit mx-auto">
+        <button onClick={() => setActiveSubTab('gallery')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${activeSubTab === 'gallery' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}>Gallery</button>
+        <button onClick={() => setActiveSubTab('plan')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${activeSubTab === 'plan' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'}`}>Plan</button>
+      </div>
+
+      {activeSubTab === 'gallery' ? (
+        <div className="grid grid-cols-2 gap-3">
+          {photos.map((p: any) => (
+            <div key={p.id} className="aspect-square rounded-[1.5rem] overflow-hidden shadow-sm border border-gray-100 relative group">
+              <img src={p.imageUrl} className="w-full h-full object-cover" />
+              {p.isSnapshot && <div className="absolute top-2 right-2 bg-blue-500 text-white text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-lg border border-white/20">Snapshot</div>}
+            </div>
+          ))}
+          <div className="aspect-square bg-slate-50 border-4 border-dashed border-slate-200 rounded-[1.5rem] flex items-center justify-center text-slate-300">
+            <Plus size={32} />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
+             <h4 className="font-black text-sm uppercase tracking-widest text-blue-600 px-1">Add Schedule</h4>
+             <div className="flex flex-col gap-3">
+               <input type="date" className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold" value={newPlanDate} onChange={e => setNewPlanDate(e.target.value)} />
+               <input className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold" placeholder="메모 (예: 성산일출봉 가기)" value={newPlanMemo} onChange={e => setNewPlanMemo(e.target.value)} />
+               <button onClick={handleAddPlan} className="bg-blue-600 text-white p-3 rounded-xl font-black text-xs">Add Plan</button>
+             </div>
+          </div>
+          <div className="space-y-4">
+             {plans.map((p: any) => (
+               <div key={p.id} className="flex gap-4 group">
+                  <div className="flex flex-col items-center">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100"><Clock size={16}/></div>
+                    <div className="w-0.5 h-full bg-slate-100 my-1"></div>
+                  </div>
+                  <div className="pb-8">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{p.date}</p>
+                    <p className="font-bold text-slate-800">{p.memo}</p>
+                  </div>
+               </div>
+             ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="p-6 space-y-8 animate-in slide-in-from-bottom-4">
+      <div className="space-y-1">
+        <h2 className="text-3xl font-black italic tracking-tighter">Memories</h2>
+        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Personal Archive</p>
+      </div>
+      <div className="grid grid-cols-1 gap-6">
+        {travels.map((t: any) => (
+          <div 
+            key={t.id} 
+            onClick={() => handleDetail(t.id)}
+            className="bg-white p-6 rounded-[2rem] shadow-md border border-gray-50 flex justify-between items-center group active:scale-95 transition-all cursor-pointer"
+          >
+            <div>
+              <h4 className="font-black text-lg text-slate-800">{t.title}</h4>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{t.startDate} - {t.endDate}</p>
+            </div>
+            <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <ChevronRight size={20} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ProfileTab({ user, bookmarks, onLogout }: any) {
+  return (
+    <div className="p-8 space-y-10 animate-in fade-in duration-500">
+      <div className="flex flex-col items-center text-center space-y-4">
+        <div className="w-24 h-24 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-[2.5rem] flex items-center justify-center text-white text-3xl font-black shadow-2xl rotate-6">
+          {user.charAt(0).toUpperCase()}
+        </div>
+        <div>
+          <h2 className="text-3xl font-black tracking-tight">{user}</h2>
+          <p className="text-blue-600 font-black text-[10px] uppercase tracking-[0.2em] mt-1 italic">World Explorer</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 bg-white p-6 rounded-[2rem] shadow-sm border border-gray-50">
+        <Stat label="Travels" value="12" />
+        <Stat label="Snaps" value="148" />
+        <Stat label="Pins" value="42" />
+      </div>
+
+      <div className="space-y-6">
+        <h3 className="text-xl font-black tracking-tighter px-1">Bookmarked</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {bookmarks.map((p: any) => (
+            <div key={p.id} className="aspect-[4/5] bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-100">
+              {p.photos?.[0] && <img src={p.photos[0].url} className="w-full h-full object-cover" />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={onLogout} className="w-full py-5 rounded-2xl bg-red-50 text-red-500 font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-colors">
+        Logout Account
+      </button>
+    </div>
+  )
+}
+
+// --- Utils ---
+
 function NavButton({ icon, label, active, onClick }: any) {
   return (
-    <button className={`flex flex-col items-center gap-1 transition-all px-4 py-2 rounded-2xl ${active ? 'text-white bg-blue-600 shadow-lg shadow-blue-500/30 scale-105' : 'text-slate-400 hover:text-slate-300'}`} onClick={onClick}>
-      {React.cloneElement(icon, { size: 20, strokeWidth: active ? 3 : 2 })}
-      <span className={`text-[8px] font-black uppercase tracking-tighter transition-all ${active ? 'opacity-100' : 'opacity-0 h-0'}`}>{label}</span>
+    <button className={`flex flex-col items-center gap-1 transition-all px-4 py-2 rounded-2xl ${active ? 'text-white bg-blue-600 shadow-lg shadow-blue-500/30 scale-105' : 'text-slate-400 hover:text-slate-200'}`} onClick={onClick}>
+      {React.cloneElement(icon, { size: 18, strokeWidth: active ? 3 : 2 })}
+      <span className={`text-[8px] font-black uppercase tracking-tighter transition-all ${active ? 'opacity-100 mt-0.5' : 'opacity-0 h-0'}`}>{label}</span>
     </button>
   )
 }
 
-function LoginScreen({ onLogin }: { onLogin: (name: string) => void }) {
-  const [name, setName] = useState('')
-  const handleLogin = async () => {
-    if (!name) return
-    try {
-      await axios.post(`${API_URL}/auth`, { username: name })
-      localStorage.setItem('plog_user', name)
-      onLogin(name)
-    } catch (e) { alert("Login Error") }
-  }
+function Input({ label, value, onChange, placeholder }: any) {
   return (
-    <div className="flex flex-col h-screen max-w-md mx-auto items-center justify-center p-8 bg-white font-sans">
-      <div className="w-full text-center space-y-12">
-        <div className="space-y-4">
-          <div className="w-20 h-20 bg-blue-600 rounded-[2rem] mx-auto flex items-center justify-center text-white shadow-2xl shadow-blue-200 rotate-12">
-            <Camera size={40} />
-          </div>
-          <h1 className="text-6xl font-black text-slate-900 italic tracking-tighter">Plog</h1>
-          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.3em]">Moments that Matter</p>
-        </div>
+    <div className="space-y-2 px-1">
+      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{label}</label>
+      <input 
+        className="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm shadow-sm focus:ring-2 focus:ring-blue-500 transition-all"
+        placeholder={placeholder}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
 
-        <div className="space-y-4 pt-10">
-          <input 
-            className="w-full p-6 bg-slate-50 border-none rounded-[2rem] focus:ring-2 focus:ring-blue-500 transition-all text-center text-xl font-black tracking-tight placeholder:text-slate-300" 
-            placeholder="Type Username" 
-            value={name} 
-            onChange={e => setName(e.target.value)} 
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          />
-          <button 
-            className="w-full bg-slate-900 text-white p-6 rounded-[2rem] font-black text-lg shadow-2xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95"
-            onClick={handleLogin}
-          >Get Started</button>
+function SelectionButton({ icon, title, desc, color, onClick }: any) {
+  return (
+    <button onClick={onClick} className="bg-white p-6 rounded-[2.5rem] shadow-md border border-gray-50 flex items-center gap-6 group active:scale-[0.98] transition-all">
+      <div className={`w-16 h-16 ${color} rounded-[1.5rem] flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
+        {icon}
+      </div>
+      <div className="text-left">
+        <h4 className="font-black text-xl text-slate-800">{title}</h4>
+        <p className="text-xs font-bold text-slate-400">{desc}</p>
+      </div>
+    </button>
+  )
+}
+
+function Stat({ label, value }: any) {
+  return (
+    <div className="text-center">
+      <p className="text-xl font-black text-slate-900">{value}</p>
+      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+    </div>
+  )
+}
+
+function PostCard({ post }: any) {
+  return (
+    <div className="bg-white rounded-[2.5rem] p-4 shadow-sm border border-gray-50 space-y-4">
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center font-bold text-blue-600 border border-blue-50">
+            {post.username?.charAt(0).toUpperCase() || 'P'}
+          </div>
+          <div>
+             <p className="font-bold text-sm text-slate-800">{post.username || 'Plog User'}</p>
+             <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest">Explorer</p>
+          </div>
+        </div>
+        <MoreHorizontal className="text-slate-400" size={18} />
+      </div>
+      <div className="aspect-[4/5] bg-slate-50 rounded-[2rem] overflow-hidden">
+        {post.photos?.[0] && <img src={post.photos[0].url} className="w-full h-full object-cover" />}
+      </div>
+      <div className="px-2 space-y-3">
+        <div className="flex justify-between items-center">
+          <div className="flex gap-5 items-center">
+            <div className="flex items-center gap-1.5"><Heart size={22} className="text-slate-700" /> <span className="text-[10px] font-black">{post.likeCount}</span></div>
+            <div className="flex items-center gap-1.5"><PlusSquare size={22} className="text-slate-700" /> <span className="text-[10px] font-black">{post.cloneCount}</span></div>
+            <Share2 size={20} className="text-slate-700" />
+          </div>
+          <Bookmark size={22} className="text-slate-700" />
+        </div>
+        <h4 className="font-black text-lg text-slate-900 leading-tight">{post.title}</h4>
+        <div className="bg-slate-50 p-4 rounded-2xl">
+          <p className="text-slate-600 text-[11px] leading-relaxed font-medium italic">"{post.contentSummary}"</p>
         </div>
       </div>
     </div>
