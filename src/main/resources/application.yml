@@ -9,14 +9,28 @@ spring:
     username: ${DATABASE_USER:${SUPABASE_DB_USER:postgres}}
     password: ${DATABASE_PASSWORD:${SUPABASE_DB_PASSWORD:postgres}}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+      validation-timeout: 5000
+      connection-test-query: SELECT 1
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: false
+    open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        jdbc:
+          batch_size: 20
+        connection:
+          provider_disables_autocommit: true
   servlet:
     multipart:
       max-file-size: 10MB
