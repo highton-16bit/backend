@@ -12,6 +12,7 @@ import java.util.*
 class SupabaseService(
     private val endpoint: String,
     private val region: String,
+    private val bucketName: String,
     private val accessKey: String,
     private val secretKey: String
 ) {
@@ -21,8 +22,6 @@ class SupabaseService(
         .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
         .forcePathStyle(true) // 수파베이스 S3는 패스 스타일(bucket/object) 강제 필수
         .build()
-
-    private val bucketName = "photos"
 
     /**
      * 파일을 S3 호환 프로토콜을 통해 업로드하고 퍼블릭 URL을 반환
