@@ -355,7 +355,13 @@ function TravelsTab({ travels, onRefresh }: any) {
       setNewPlanStartTime('')
       setNewPlanEndTime('')
       handleDetail(selectedId)
-    } catch (e) { alert("일정 추가 실패") }
+    } catch (e: any) { 
+      if (e.response?.status === 400) {
+        alert("시간 설정이 잘못되었습니다: 시작 시간이 종료 시간보다 늦을 수 없습니다.")
+      } else {
+        alert("일정 추가 실패")
+      }
+    }
   }
 
   if (selectedId) return (
@@ -422,8 +428,8 @@ function TravelsTab({ travels, onRefresh }: any) {
                 </div>
 
                 {/* Body (Time Slots) */}
-                <div className="max-h-[400px] overflow-y-auto scrollbar-hide">
-                  {["08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"].map(hour => (
+                <div className="max-h-[500px] overflow-y-auto scrollbar-hide">
+                  {["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"].map(hour => (
                     <div key={hour} className="flex border-b border-gray-50 last:border-b-0">
                       {/* Time Label */}
                       <div className="w-16 flex-shrink-0 border-r border-gray-100 p-2 flex items-center justify-center">

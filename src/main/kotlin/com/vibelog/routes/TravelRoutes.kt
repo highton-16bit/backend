@@ -92,6 +92,13 @@ fun Route.travelRoutes() {
             val travelId = UUID.fromString(call.parameters["id"])
             val request = call.receive<PlanItemCreateRequest>()
             
+            // 시간 검증: 시작 시간이 종료 시간보다 늦으면 에러 (예: 03:00 ~ 02:00 차단)
+            if (request.startTime != null && request.endTime != null) {
+                if (request.startTime > request.endTime) {
+                    return@post call.respond(HttpStatusCode.BadRequest, "Start time must be earlier than end time")
+                }
+            }
+
             val newPlanId = dbQuery {
                 TravelPlanItems.insert {
                     it[TravelPlanItems.travelId] = travelId
