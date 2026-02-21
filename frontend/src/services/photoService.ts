@@ -9,38 +9,41 @@ export interface UploadPhotoResponse {
 }
 
 export const photoService = {
-  // 사진 업로드 (멀티파트)
+  /**
+   * 사진 업로드 + DB 저장 (2단계 자동 처리)
+   * 1. S3 업로드 → URL 반환
+   * 2. 여행에 사진 등록 (메타데이터 추출)
+   */
   upload: async (
     file: File,
     travelId: string,
     isSnapshot: boolean = false
   ): Promise<UploadPhotoResponse> => {
+    // Step 1: S3 업로드
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('travelId', travelId)
-    formData.append('isSnapshot', String(isSnapshot))
 
-    const response = await apiClient.post<UploadPhotoResponse>('/photos/upload', formData, {
+    const s3Response = await apiClient.post<{ url: string }>('/photos/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     })
-    return response.data
-  },
 
-  // 사진 메타데이터 직접 등록 (URL 기반)
-  register: async (
-    travelId: string,
-    data: {
-      imageUrl: string
-      isSnapshot?: boolean
-      latitude?: number
-      longitude?: number
-      capturedAt?: string
+    const imageUrl = s3Response.data.url
+
+    // Step 2: 여행에 사진 등록 (백엔드에서 메타데이터 추출)
+    const registerResponse = await apiClient.post<{ id: string }>(`/travels/${travelId}/photos`, {
+      imageUrl,
+      isSnapshot,
+    })
+
+    return {
+      id: registerResponse.data.id,
+      url: imageUrl,
+      latitude: null,
+      longitude: null,
+      capturedAt: null,
     }
-  ): Promise<{ id: string }> => {
-    const response = await apiClient.post<{ id: string }>(`/travels/${travelId}/photos`, data)
-    return response.data
   },
 
   // 사진 삭제
