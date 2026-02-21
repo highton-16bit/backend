@@ -7,6 +7,8 @@ export interface Post {
   username?: string
   photos?: PostPhoto[]
   createdAt: string
+  isLiked: boolean
+  isBookmarked: boolean
 }
 
 export interface PostPhoto {
@@ -18,6 +20,12 @@ export interface CreatePostRequest {
   travelId: string
   title: string
   photoIds: string[]
+}
+
+export interface UpdatePostRequest {
+  title?: string
+  contentSummary?: string
+  photoIds?: string[]
 }
 
 export interface AISearchResponse {

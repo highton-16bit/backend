@@ -5,6 +5,7 @@ import type {
   TravelPhoto,
   CreateTravelRequest,
   CreatePlanItemRequest,
+  UpdateTravelRequest,
 } from '../types'
 
 export const travelService = {
@@ -39,6 +40,11 @@ export const travelService = {
   // 여행 삭제
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/travels/${id}`)
+  },
+
+  // 여행 수정
+  update: async (id: string, data: UpdateTravelRequest): Promise<void> => {
+    await apiClient.patch(`/travels/${id}`, data)
   },
 
   // === 여행 일정 ===

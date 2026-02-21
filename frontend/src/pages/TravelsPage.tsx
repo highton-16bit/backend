@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Plus } from 'lucide-react'
 import type { Travel, TravelPlanItem, TravelPhoto } from '../types'
 import { TravelCard, PhotoGallery, PhotoUploader, TimetableGrid } from '../components/travel'
 import { travelService, photoService } from '../services'
 import { getErrorMessage } from '../services/api'
 import { validateTimeRange } from '../utils/validation'
+import { FAB, DatePicker, TimePicker, Modal, Input, Button } from '../components/common'
 
 interface TravelsPageProps {
   travels: Travel[]
@@ -19,12 +20,20 @@ export default function TravelsPage({ travels, onRefresh: _onRefresh }: TravelsP
   const [photos, setPhotos] = useState<TravelPhoto[]>([])
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('gallery')
   const [isPhotoUploaderOpen, setIsPhotoUploaderOpen] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
   // Plan Form State
   const [newPlanMemo, setNewPlanMemo] = useState('')
   const [newPlanDate, setNewPlanDate] = useState('')
   const [newPlanStartTime, setNewPlanStartTime] = useState('')
   const [newPlanEndTime, setNewPlanEndTime] = useState('')
+
+  // Create Travel Form State
+  const [newTravelTitle, setNewTravelTitle] = useState('')
+  const [newTravelStartDate, setNewTravelStartDate] = useState('')
+  const [newTravelEndDate, setNewTravelEndDate] = useState('')
+  const [newTravelRegion, setNewTravelRegion] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
 
   const handleTravelSelect = async (travel: Travel) => {
     setSelectedTravel(travel)
@@ -97,6 +106,38 @@ export default function TravelsPage({ travels, onRefresh: _onRefresh }: TravelsP
     setPhotos(updatedPhotos)
   }
 
+  const handleCreateTravel = async () => {
+    if (!newTravelTitle.trim() || !newTravelStartDate || !newTravelEndDate) {
+      alert('제목과 날짜를 입력해주세요')
+      return
+    }
+
+    if (newTravelStartDate > newTravelEndDate) {
+      alert('시작일이 종료일보다 늦을 수 없습니다')
+      return
+    }
+
+    setIsCreating(true)
+    try {
+      await travelService.create({
+        title: newTravelTitle,
+        startDate: newTravelStartDate,
+        endDate: newTravelEndDate,
+        regionName: newTravelRegion || undefined,
+      })
+      setNewTravelTitle('')
+      setNewTravelStartDate('')
+      setNewTravelEndDate('')
+      setNewTravelRegion('')
+      setIsCreateModalOpen(false)
+      _onRefresh()
+    } catch (error) {
+      alert(getErrorMessage(error))
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
   // Travel Detail View
   if (selectedTravel) {
     return (
@@ -156,48 +197,40 @@ export default function TravelsPage({ travels, onRefresh: _onRefresh }: TravelsP
                 Add Schedule
               </h4>
               <div className="flex flex-col gap-3">
-                <input
-                  type="date"
-                  className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold"
+                <DatePicker
+                  label="날짜"
                   value={newPlanDate}
-                  onChange={(e) => setNewPlanDate(e.target.value)}
+                  onChange={setNewPlanDate}
+                  placeholder="날짜 선택"
+                  minDate={selectedTravel.startDate}
+                  maxDate={selectedTravel.endDate}
                 />
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-400 px-1">
-                      Start
-                    </label>
-                    <input
-                      type="time"
-                      className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold"
-                      value={newPlanStartTime}
-                      onChange={(e) => setNewPlanStartTime(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black uppercase text-slate-400 px-1">
-                      End
-                    </label>
-                    <input
-                      type="time"
-                      className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold"
-                      value={newPlanEndTime}
-                      onChange={(e) => setNewPlanEndTime(e.target.value)}
-                    />
-                  </div>
+                  <TimePicker
+                    label="시작"
+                    value={newPlanStartTime}
+                    onChange={setNewPlanStartTime}
+                    placeholder="시작 시간"
+                  />
+                  <TimePicker
+                    label="종료"
+                    value={newPlanEndTime}
+                    onChange={setNewPlanEndTime}
+                    placeholder="종료 시간"
+                  />
                 </div>
-                <input
-                  className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold"
-                  placeholder="메모 (예: 성산일출봉 가기)"
+                <Input
+                  label="메모"
+                  placeholder="예: 성산일출봉 가기"
                   value={newPlanMemo}
-                  onChange={(e) => setNewPlanMemo(e.target.value)}
+                  onChange={setNewPlanMemo}
                 />
-                <button
+                <Button
                   onClick={handleAddPlan}
-                  className="bg-blue-600 text-white p-4 rounded-xl font-black text-xs shadow-lg shadow-blue-100 active:scale-95 transition-all"
+                  className="w-full"
                 >
                   Add Plan
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -239,6 +272,54 @@ export default function TravelsPage({ travels, onRefresh: _onRefresh }: TravelsP
           ))}
         </div>
       )}
+
+      {/* FAB for adding new travel */}
+      <FAB
+        icon={<Plus size={24} />}
+        onClick={() => setIsCreateModalOpen(true)}
+      />
+
+      {/* Create Travel Modal */}
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="새 여행 만들기"
+      >
+        <div className="p-4 space-y-4">
+          <Input
+            label="여행 제목"
+            placeholder="예: 제주도 여행"
+            value={newTravelTitle}
+            onChange={setNewTravelTitle}
+          />
+          <DatePicker
+            label="시작일"
+            value={newTravelStartDate}
+            onChange={setNewTravelStartDate}
+            placeholder="시작일 선택"
+          />
+          <DatePicker
+            label="종료일"
+            value={newTravelEndDate}
+            onChange={setNewTravelEndDate}
+            placeholder="종료일 선택"
+            minDate={newTravelStartDate}
+          />
+          <Input
+            label="지역 (선택)"
+            placeholder="예: 제주도"
+            value={newTravelRegion}
+            onChange={setNewTravelRegion}
+          />
+          <Button
+            onClick={handleCreateTravel}
+            disabled={isCreating}
+            className="w-full"
+          >
+            {isCreating ? '생성 중...' : '여행 만들기'}
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

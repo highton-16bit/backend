@@ -19,16 +19,41 @@ class PostController(
     private val travelService: TravelService,
     private val userService: UserService
 ) {
-    @Operation(summary = "피드 조회", description = "전체 게시글을 최신순으로 조회합니다")
+    @Operation(
+        summary = "피드 조회",
+        description = """
+        전체 게시글을 최신순으로 조회합니다.
+        Authorization 헤더가 있으면 isLiked, isBookmarked 필드가 현재 사용자 기준으로 설정됩니다.
+
+        **사용 화면:** HomePage, DiscoveryPage
+        **관련 API:** POST /posts/{id}/like, POST /posts/{id}/bookmark
+        """
+    )
     @GetMapping
-    fun getFeed(): ResponseEntity<PostListResponse> {
-        return ResponseEntity.ok(PostListResponse(posts = postService.findAll()))
+    fun getFeed(
+        @RequestHeader("Authorization", required = false) username: String?
+    ): ResponseEntity<PostListResponse> {
+        val userId = username?.let { userService.findByUsername(it)?.id }
+        return ResponseEntity.ok(PostListResponse(posts = postService.findAll(userId)))
     }
 
-    @Operation(summary = "게시글 상세 조회")
+    @Operation(
+        summary = "게시글 상세 조회",
+        description = """
+        게시글 상세 정보를 조회합니다.
+        Authorization 헤더가 있으면 isLiked, isBookmarked 필드가 현재 사용자 기준으로 설정됩니다.
+
+        **사용 화면:** PostDetail 모달
+        **관련 API:** PATCH /posts/{id}, DELETE /posts/{id}
+        """
+    )
     @GetMapping("/{id}")
-    fun getPost(@PathVariable id: UUID): ResponseEntity<Any> {
-        val post = postService.findById(id)
+    fun getPost(
+        @PathVariable id: UUID,
+        @RequestHeader("Authorization", required = false) username: String?
+    ): ResponseEntity<Any> {
+        val userId = username?.let { userService.findByUsername(it)?.id }
+        val post = postService.findById(id, userId)
             ?: return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(MessageResponse("Post not found"))
 
@@ -60,6 +85,59 @@ class PostController(
 
         val response = postService.create(user, travel, request, photoIds)
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    @Operation(
+        summary = "게시글 수정",
+        description = """
+        게시글의 제목, 본문, 사진을 수정합니다. 본인 게시글만 수정 가능합니다.
+
+        **사용 화면:** NewPage > ShareMemory > Step3 (Edit Post)
+        **관련 API:** GET /posts/{id}, GET /travels/{id}/photos
+        """
+    )
+    @PatchMapping("/{id}")
+    fun updatePost(
+        @RequestHeader("Authorization") username: String,
+        @PathVariable id: UUID,
+        @RequestBody request: PostUpdateRequest
+    ): ResponseEntity<Any> {
+        val user = userService.findByUsername(username)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(MessageResponse("Unauthorized"))
+
+        return try {
+            postService.update(id, user.id, request)
+            ResponseEntity.ok(MessageResponse("Updated"))
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(MessageResponse(e.message ?: "Invalid request"))
+        }
+    }
+
+    @Operation(
+        summary = "게시글 삭제",
+        description = """
+        게시글을 삭제합니다. 본인 게시글만 삭제 가능합니다.
+
+        **사용 화면:** ProfilePage (내 게시글 관리)
+        **관련 API:** GET /posts/{id}
+        """
+    )
+    @DeleteMapping("/{id}")
+    fun deletePost(
+        @RequestHeader("Authorization") username: String,
+        @PathVariable id: UUID
+    ): ResponseEntity<Any> {
+        val user = userService.findByUsername(username)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(MessageResponse("Unauthorized"))
+
+        return try {
+            postService.delete(id, user.id)
+            ResponseEntity.ok(MessageResponse("Deleted"))
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(MessageResponse(e.message ?: "Invalid request"))
+        }
     }
 
     @Operation(summary = "좋아요 토글")

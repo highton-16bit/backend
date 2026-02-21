@@ -102,6 +102,23 @@ class PhotoService(
         return photoRepository.save(photo).id.toString()
     }
 
+    @Transactional
+    fun delete(travelId: UUID, photoId: UUID) {
+        val photo = photoRepository.findById(photoId)
+            .orElseThrow { IllegalArgumentException("Photo not found") }
+
+        require(photo.travel.id == travelId) { "Photo does not belong to this travel" }
+
+        // S3에서 파일 삭제 시도
+        try {
+            supabaseService.delete(photo.imageUrl)
+        } catch (e: Exception) {
+            // S3 삭제 실패해도 DB에서는 삭제 진행
+        }
+
+        photoRepository.delete(photo)
+    }
+
     private fun TravelPhoto.toResponse() = PhotoResponse(
         id = id.toString(),
         imageUrl = imageUrl,

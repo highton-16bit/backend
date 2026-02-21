@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { X, Calendar, Share2, Check } from 'lucide-react'
-import type { Travel, TravelPhoto } from '../types'
-import { Input } from '../components/common'
+import { useState, useReducer } from 'react'
+import { X, Calendar, Share2 } from 'lucide-react'
+import type { Travel, TravelPhoto, TravelPlanItem } from '../types'
+import { Input, DatePicker, Button } from '../components/common'
+import { TravelSelector, PhotoSelector, PostEditor } from '../components/share'
 import { travelService, postService } from '../services'
 import { getErrorMessage } from '../services/api'
 import { validateDateRange, validateRequired } from '../utils/validation'
@@ -11,10 +12,119 @@ interface NewPageProps {
   onComplete: () => void
 }
 
-type Mode = 'select' | 'create_travel' | 'share_post'
+type Mode = 'select' | 'create_travel' | 'share_memory'
+
+// Share Memory Step State
+type ShareStep = 'select_travel' | 'select_photos' | 'edit_post'
+
+interface ShareState {
+  step: ShareStep
+  selectedTravel: Travel | null
+  travelPhotos: TravelPhoto[]
+  travelPlans: TravelPlanItem[]
+  selectedPhotoIds: string[]
+  photoOrder: string[]
+  postTitle: string
+  postContent: string
+}
+
+type ShareAction =
+  | { type: 'SELECT_TRAVEL'; travel: Travel; photos: TravelPhoto[]; plans: TravelPlanItem[] }
+  | { type: 'TOGGLE_PHOTO'; photoId: string }
+  | { type: 'CONTINUE_TO_EDIT' }
+  | { type: 'BACK_TO_TRAVEL' }
+  | { type: 'BACK_TO_PHOTOS' }
+  | { type: 'REORDER_PHOTOS'; order: string[] }
+  | { type: 'REMOVE_PHOTO'; photoId: string }
+  | { type: 'SET_TITLE'; title: string }
+  | { type: 'SET_CONTENT'; content: string }
+  | { type: 'RESET' }
+
+const initialShareState: ShareState = {
+  step: 'select_travel',
+  selectedTravel: null,
+  travelPhotos: [],
+  travelPlans: [],
+  selectedPhotoIds: [],
+  photoOrder: [],
+  postTitle: '',
+  postContent: '',
+}
+
+function shareReducer(state: ShareState, action: ShareAction): ShareState {
+  switch (action.type) {
+    case 'SELECT_TRAVEL':
+      return {
+        ...state,
+        step: 'select_photos',
+        selectedTravel: action.travel,
+        travelPhotos: action.photos,
+        travelPlans: action.plans,
+        selectedPhotoIds: [],
+        photoOrder: [],
+        postTitle: action.travel.title,
+        postContent: '',
+      }
+    case 'TOGGLE_PHOTO':
+      const isSelected = state.selectedPhotoIds.includes(action.photoId)
+      return {
+        ...state,
+        selectedPhotoIds: isSelected
+          ? state.selectedPhotoIds.filter((id) => id !== action.photoId)
+          : [...state.selectedPhotoIds, action.photoId],
+      }
+    case 'CONTINUE_TO_EDIT':
+      return {
+        ...state,
+        step: 'edit_post',
+        photoOrder: state.selectedPhotoIds,
+      }
+    case 'BACK_TO_TRAVEL':
+      return {
+        ...state,
+        step: 'select_travel',
+        selectedTravel: null,
+        travelPhotos: [],
+        travelPlans: [],
+        selectedPhotoIds: [],
+        photoOrder: [],
+      }
+    case 'BACK_TO_PHOTOS':
+      return {
+        ...state,
+        step: 'select_photos',
+      }
+    case 'REORDER_PHOTOS':
+      return {
+        ...state,
+        photoOrder: action.order,
+      }
+    case 'REMOVE_PHOTO':
+      return {
+        ...state,
+        photoOrder: state.photoOrder.filter((id) => id !== action.photoId),
+        selectedPhotoIds: state.selectedPhotoIds.filter((id) => id !== action.photoId),
+      }
+    case 'SET_TITLE':
+      return {
+        ...state,
+        postTitle: action.title,
+      }
+    case 'SET_CONTENT':
+      return {
+        ...state,
+        postContent: action.content,
+      }
+    case 'RESET':
+      return initialShareState
+    default:
+      return state
+  }
+}
 
 export default function NewPage({ myTravels, onComplete }: NewPageProps) {
   const [mode, setMode] = useState<Mode>('select')
+  const [shareState, shareDispatch] = useReducer(shareReducer, initialShareState)
 
   // Create Travel State
   const [title, setTitle] = useState('')
@@ -22,12 +132,6 @@ export default function NewPage({ myTravels, onComplete }: NewPageProps) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  // Share Post State
-  const [selectedTravelId, setSelectedTravelId] = useState('')
-  const [postTitle, setPostTitle] = useState('')
-  const [travelPhotos, setTravelPhotos] = useState<TravelPhoto[]>([])
-  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   const resetForm = () => {
@@ -35,15 +139,11 @@ export default function NewPage({ myTravels, onComplete }: NewPageProps) {
     setRegion('')
     setStartDate('')
     setEndDate('')
-    setSelectedTravelId('')
-    setPostTitle('')
-    setTravelPhotos([])
-    setSelectedPhotoIds([])
     setErrors({})
+    shareDispatch({ type: 'RESET' })
   }
 
   const handleCreateTravel = async () => {
-    // Validation
     const newErrors: Record<string, string> = {}
     const titleError = validateRequired(title, '제목')
     const dateError = validateDateRange(startDate, endDate)
@@ -74,30 +174,32 @@ export default function NewPage({ myTravels, onComplete }: NewPageProps) {
     }
   }
 
-  const handleTravelSelect = async (id: string) => {
-    setSelectedTravelId(id)
+  const handleTravelSelect = async (travel: Travel) => {
     try {
-      const photos = await travelService.getPhotos(id)
-      setTravelPhotos(photos)
+      const [photos, plans] = await Promise.all([
+        travelService.getPhotos(travel.id),
+        travelService.getPlans(travel.id),
+      ])
+      shareDispatch({ type: 'SELECT_TRAVEL', travel, photos, plans })
     } catch (error) {
       console.error(error)
     }
   }
 
   const handleSharePost = async () => {
-    if (!selectedTravelId || !postTitle.trim()) {
-      alert('여행과 제목을 선택해주세요')
+    if (!shareState.selectedTravel || !shareState.postTitle.trim()) {
+      alert('제목을 입력해주세요')
       return
     }
 
     setIsLoading(true)
     try {
       await postService.create({
-        travelId: selectedTravelId,
-        title: postTitle,
-        photoIds: selectedPhotoIds,
+        travelId: shareState.selectedTravel.id,
+        title: shareState.postTitle,
+        photoIds: shareState.photoOrder,
       })
-      alert('게시글이 공유되었습니다! (AI 일정이 자동 포함됩니다)')
+      alert('게시글이 공유되었습니다!')
       resetForm()
       onComplete()
     } catch (error) {
@@ -107,16 +209,10 @@ export default function NewPage({ myTravels, onComplete }: NewPageProps) {
     }
   }
 
-  const togglePhotoSelection = (photoId: string) => {
-    setSelectedPhotoIds((prev) =>
-      prev.includes(photoId) ? prev.filter((id) => id !== photoId) : [...prev, photoId]
-    )
-  }
-
   // Create Travel Form
   if (mode === 'create_travel') {
     return (
-      <div className="p-8 space-y-8 animate-in slide-in-from-bottom-4">
+      <div className="p-6 space-y-6 animate-in slide-in-from-bottom-4">
         <button
           onClick={() => {
             resetForm()
@@ -127,7 +223,7 @@ export default function NewPage({ myTravels, onComplete }: NewPageProps) {
           <X size={16} /> Back
         </button>
 
-        <h2 className="text-3xl font-black italic">Start New Journey</h2>
+        <h2 className="text-2xl font-black italic tracking-tight">Start New Journey</h2>
 
         <div className="space-y-4">
           <Input
@@ -143,148 +239,122 @@ export default function NewPage({ myTravels, onComplete }: NewPageProps) {
             onChange={setRegion}
             placeholder="제주, 서귀포"
           />
-          <div className="grid grid-cols-2 gap-4">
-            <Input
+          <div className="grid grid-cols-2 gap-3">
+            <DatePicker
               label="Start"
-              type="date"
               value={startDate}
               onChange={setStartDate}
+              placeholder="시작일"
               error={errors.date}
             />
-            <Input label="End" type="date" value={endDate} onChange={setEndDate} />
+            <DatePicker
+              label="End"
+              value={endDate}
+              onChange={setEndDate}
+              placeholder="종료일"
+              minDate={startDate}
+            />
           </div>
 
-          <button
+          <Button
             onClick={handleCreateTravel}
             disabled={isLoading}
-            className="w-full bg-blue-600 text-white p-5 rounded-[1.5rem] font-black text-lg shadow-xl shadow-blue-100 active:scale-95 transition-all mt-4 disabled:opacity-50"
+            isLoading={isLoading}
+            className="w-full mt-4"
+            size="lg"
           >
-            {isLoading ? 'Creating...' : 'Create Journey'}
-          </button>
+            Create Journey
+          </Button>
         </div>
       </div>
     )
   }
 
-  // Share Post Form
-  if (mode === 'share_post') {
+  // Share Memory Flow (3 Steps)
+  if (mode === 'share_memory') {
     return (
-      <div className="p-8 space-y-8 animate-in slide-in-from-bottom-4">
-        <button
-          onClick={() => {
-            resetForm()
-            setMode('select')
-          }}
-          className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase"
-        >
-          <X size={16} /> Back
-        </button>
-
-        <h2 className="text-3xl font-black italic">Share Memory</h2>
-
-        <div className="space-y-6">
-          <div>
-            <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 px-1">
-              Select Travel
-            </label>
-            <select
-              className="w-full p-4 bg-white border border-gray-100 rounded-2xl font-bold text-sm shadow-sm"
-              value={selectedTravelId}
-              onChange={(e) => handleTravelSelect(e.target.value)}
+      <div className="p-6 animate-in slide-in-from-bottom-4">
+        {shareState.step === 'select_travel' && (
+          <>
+            <button
+              onClick={() => {
+                resetForm()
+                setMode('select')
+              }}
+              className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase mb-4"
             >
-              <option value="">여행 선택...</option>
-              {myTravels.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-          </div>
+              <X size={16} /> Back
+            </button>
+            <TravelSelector
+              travels={myTravels}
+              onSelect={handleTravelSelect}
+            />
+          </>
+        )}
 
-          <Input
-            label="Post Title"
-            value={postTitle}
-            onChange={setPostTitle}
-            placeholder="이번 여행의 한 줄 평"
+        {shareState.step === 'select_photos' && (
+          <PhotoSelector
+            photos={shareState.travelPhotos}
+            selectedIds={shareState.selectedPhotoIds}
+            onToggle={(id) => shareDispatch({ type: 'TOGGLE_PHOTO', photoId: id })}
+            onBack={() => shareDispatch({ type: 'BACK_TO_TRAVEL' })}
+            onContinue={() => shareDispatch({ type: 'CONTINUE_TO_EDIT' })}
           />
+        )}
 
-          {travelPhotos.length > 0 && (
-            <div>
-              <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 px-1">
-                Select Photos ({selectedPhotoIds.length})
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {travelPhotos.map((photo) => (
-                  <div
-                    key={photo.id}
-                    onClick={() => togglePhotoSelection(photo.id)}
-                    className={`aspect-square rounded-xl overflow-hidden border-4 transition-all relative cursor-pointer ${
-                      selectedPhotoIds.includes(photo.id)
-                        ? 'border-blue-500 scale-90 shadow-lg'
-                        : 'border-transparent'
-                    }`}
-                  >
-                    <img
-                      src={photo.imageUrl}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
-                    {selectedPhotoIds.includes(photo.id) && (
-                      <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full p-0.5">
-                        <Check size={10} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={handleSharePost}
-            disabled={isLoading}
-            className="w-full bg-blue-600 text-white p-5 rounded-[1.5rem] font-black text-lg shadow-xl shadow-blue-100 active:scale-95 transition-all mt-4 disabled:opacity-50"
-          >
-            {isLoading ? 'Posting...' : 'Post with AI Summary'}
-          </button>
-        </div>
+        {shareState.step === 'edit_post' && (
+          <PostEditor
+            photos={shareState.travelPhotos}
+            photoOrder={shareState.photoOrder}
+            plans={shareState.travelPlans}
+            title={shareState.postTitle}
+            content={shareState.postContent}
+            isSubmitting={isLoading}
+            onPhotoReorder={(order) => shareDispatch({ type: 'REORDER_PHOTOS', order })}
+            onPhotoRemove={(id) => shareDispatch({ type: 'REMOVE_PHOTO', photoId: id })}
+            onTitleChange={(title) => shareDispatch({ type: 'SET_TITLE', title })}
+            onContentChange={(content) => shareDispatch({ type: 'SET_CONTENT', content })}
+            onBack={() => shareDispatch({ type: 'BACK_TO_PHOTOS' })}
+            onSubmit={handleSharePost}
+          />
+        )}
       </div>
     )
   }
 
   // Mode Selection
   return (
-    <div className="p-12 flex flex-col items-center justify-center min-h-[80vh] space-y-16 animate-in zoom-in-95">
+    <div className="p-8 flex flex-col items-center justify-center min-h-[70vh] space-y-12 animate-in zoom-in-95">
       <div className="text-center space-y-2">
-        <h2 className="text-4xl font-black tracking-tighter italic">What's Next?</h2>
-        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.3em]">
+        <h2 className="text-3xl font-black tracking-tighter italic">What's Next?</h2>
+        <p className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.25em]">
           Build your happiness archive
         </p>
       </div>
 
-      <div className="w-full grid grid-cols-1 gap-6">
+      <div className="w-full grid grid-cols-1 gap-5">
         <button
           onClick={() => setMode('create_travel')}
-          className="bg-white p-6 rounded-[2.5rem] shadow-md border border-gray-50 flex items-center gap-6 group active:scale-[0.98] transition-all"
+          className="bg-white p-5 rounded-[2rem] shadow-md border border-gray-50 flex items-center gap-5 group active:scale-[0.98] transition-all"
         >
-          <div className="w-16 h-16 bg-blue-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
-            <Calendar size={32} />
+          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+            <Calendar size={28} />
           </div>
           <div className="text-left">
-            <h4 className="font-black text-xl text-slate-800">New Journey</h4>
+            <h4 className="font-black text-lg text-slate-800">New Journey</h4>
             <p className="text-xs font-bold text-slate-400">새로운 여행 계획 등록</p>
           </div>
         </button>
 
         <button
-          onClick={() => setMode('share_post')}
-          className="bg-white p-6 rounded-[2.5rem] shadow-md border border-gray-50 flex items-center gap-6 group active:scale-[0.98] transition-all"
+          onClick={() => setMode('share_memory')}
+          className="bg-white p-5 rounded-[2rem] shadow-md border border-gray-50 flex items-center gap-5 group active:scale-[0.98] transition-all"
         >
-          <div className="w-16 h-16 bg-indigo-600 rounded-[1.5rem] flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
-            <Share2 size={32} />
+          <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+            <Share2 size={28} />
           </div>
           <div className="text-left">
-            <h4 className="font-black text-xl text-slate-800">Share Memory</h4>
+            <h4 className="font-black text-lg text-slate-800">Share Memory</h4>
             <p className="text-xs font-bold text-slate-400">AI 기반 게시글 공유</p>
           </div>
         </button>

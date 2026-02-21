@@ -61,4 +61,29 @@ class PhotoController(
         val photoId = photoService.createWithMetadata(travel, request)
         return ResponseEntity.status(HttpStatus.CREATED).body(IdResponse(photoId))
     }
+
+    @Operation(
+        summary = "사진 삭제",
+        description = """
+        여행에서 사진을 삭제합니다. S3 스토리지의 파일도 함께 삭제됩니다.
+
+        **사용 화면:**
+        - TravelsPage > Gallery > Photo Delete
+        - NewPage > ShareMemory > Step3 (사진 제거)
+
+        **관련 API:** GET /travels/{id}/photos, POST /photos/upload
+        """
+    )
+    @DeleteMapping("/travels/{id}/photos/{photoId}")
+    fun deletePhoto(
+        @PathVariable id: UUID,
+        @PathVariable photoId: UUID
+    ): ResponseEntity<Any> {
+        return try {
+            photoService.delete(id, photoId)
+            ResponseEntity.ok(MessageResponse("Deleted"))
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(MessageResponse(e.message ?: "Invalid request"))
+        }
+    }
 }

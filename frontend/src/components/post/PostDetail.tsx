@@ -102,7 +102,10 @@ export default function PostDetail({
                 onClick={onLike}
                 className="flex items-center gap-1.5 hover:scale-110 transition-transform"
               >
-                <Heart size={24} className="text-slate-700" />
+                <Heart
+                  size={24}
+                  className={post.isLiked ? 'text-red-500 fill-red-500' : 'text-slate-700'}
+                />
                 <span className="text-xs font-black">{post.likeCount}</span>
               </button>
               <button
@@ -115,7 +118,10 @@ export default function PostDetail({
               <Share2 size={22} className="text-slate-700 cursor-pointer hover:scale-110 transition-transform" />
             </div>
             <button onClick={onBookmark} className="hover:scale-110 transition-transform">
-              <Bookmark size={24} className="text-slate-700" />
+              <Bookmark
+                size={24}
+                className={post.isBookmarked ? 'text-blue-600 fill-blue-600' : 'text-slate-700'}
+              />
             </button>
           </div>
 

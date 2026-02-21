@@ -72,6 +72,33 @@ class TravelController(
         return ResponseEntity.status(HttpStatus.CREATED).body(IdResponse(id))
     }
 
+    @Operation(
+        summary = "여행 수정",
+        description = """
+        여행 정보를 부분 수정합니다. 본인의 여행만 수정 가능합니다.
+
+        **사용 화면:** TravelsPage > Travel Detail (수정 모드)
+        **관련 API:** GET /travels/{id}, DELETE /travels/{id}
+        """
+    )
+    @PatchMapping("/{id}")
+    fun updateTravel(
+        @RequestHeader("Authorization") username: String,
+        @PathVariable id: UUID,
+        @RequestBody request: TravelUpdateRequest
+    ): ResponseEntity<Any> {
+        val user = userService.findByUsername(username)
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(MessageResponse("Unauthorized"))
+
+        return try {
+            travelService.update(id, user.id, request)
+            ResponseEntity.ok(MessageResponse("Updated"))
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(MessageResponse(e.message ?: "Invalid request"))
+        }
+    }
+
     @Operation(summary = "여행 삭제")
     @DeleteMapping("/{id}")
     fun deleteTravel(@PathVariable id: UUID): ResponseEntity<MessageResponse> {

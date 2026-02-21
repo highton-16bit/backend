@@ -17,13 +17,13 @@ class PostService(
     private val planItemRepository: TravelPlanItemRepository,
     private val geminiService: GeminiService
 ) {
-    fun findAll(): List<PostResponse> {
+    fun findAll(userId: UUID? = null): List<PostResponse> {
         return postRepository.findAllByOrderByCreatedAtDesc()
-            .map { it.toResponse() }
+            .map { it.toResponse(userId) }
     }
 
-    fun findById(id: UUID): PostResponse? {
-        return postRepository.findById(id).orElse(null)?.toResponse()
+    fun findById(id: UUID, userId: UUID? = null): PostResponse? {
+        return postRepository.findById(id).orElse(null)?.toResponse(userId)
     }
 
     @Transactional
@@ -99,11 +99,6 @@ class PostService(
         }
     }
 
-    fun findBookmarkedPosts(userId: UUID): List<PostResponse> {
-        return bookmarkRepository.findBookmarkedPosts(userId)
-            .map { it.toResponse() }
-    }
-
     fun getPostEntity(id: UUID): Post? {
         return postRepository.findById(id).orElse(null)
     }
@@ -115,10 +110,58 @@ class PostService(
         }
     }
 
-    private fun Post.toResponse(): PostResponse {
+    @Transactional
+    fun update(id: UUID, userId: UUID, request: PostUpdateRequest) {
+        val post = postRepository.findById(id)
+            .orElseThrow { IllegalArgumentException("Post not found") }
+
+        require(post.user.id == userId) { "Unauthorized: You can only edit your own post" }
+
+        request.title?.let { post.title = it }
+        request.contentSummary?.let { post.contentSummary = it }
+
+        request.photoIds?.let { photoIds ->
+            post.photos.clear()
+            photoIds.forEach { photoIdStr ->
+                try {
+                    val photoId = UUID.fromString(photoIdStr)
+                    travelPhotoRepository.findById(photoId).ifPresent { photo ->
+                        post.photos.add(photo)
+                    }
+                } catch (e: Exception) {
+                    // Invalid UUID, skip
+                }
+            }
+        }
+    }
+
+    @Transactional
+    fun delete(id: UUID, userId: UUID) {
+        val post = postRepository.findById(id)
+            .orElseThrow { IllegalArgumentException("Post not found") }
+
+        require(post.user.id == userId) { "Unauthorized: You can only delete your own post" }
+
+        postRepository.delete(post)
+    }
+
+    fun findBookmarkedPosts(userId: UUID): List<PostResponse> {
+        return bookmarkRepository.findBookmarkedPosts(userId)
+            .map { it.toResponse(userId) }
+    }
+
+    private fun Post.toResponse(currentUserId: UUID? = null): PostResponse {
         val photosWithCoords = photos.filter { it.latitude != null && it.longitude != null }
         val avgLat = photosWithCoords.mapNotNull { it.latitude }.takeIf { it.isNotEmpty() }?.average()
         val avgLng = photosWithCoords.mapNotNull { it.longitude }.takeIf { it.isNotEmpty() }?.average()
+
+        val isLiked = currentUserId?.let {
+            postLikeRepository.existsByUserIdAndPostId(it, id)
+        } ?: false
+
+        val isBookmarked = currentUserId?.let {
+            bookmarkRepository.existsByUserIdAndPostId(it, id)
+        } ?: false
 
         return PostResponse(
             id = id.toString(),
@@ -138,7 +181,9 @@ class PostService(
             },
             regionName = travel.regionName,
             latitude = avgLat,
-            longitude = avgLng
+            longitude = avgLng,
+            isLiked = isLiked,
+            isBookmarked = isBookmarked
         )
     }
 }

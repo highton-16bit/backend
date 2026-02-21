@@ -1,5 +1,5 @@
 interface InputProps {
-  label: string
+  label?: string
   value: string
   onChange: (value: string) => void
   placeholder?: string
@@ -19,9 +19,11 @@ export default function Input({
 }: InputProps) {
   return (
     <div className="space-y-2 px-1">
-      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-        {label}
-      </label>
+      {label && (
+        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+          {label}
+        </label>
+      )}
       <input
         type={type}
         className={`w-full p-4 bg-white border rounded-2xl font-bold text-sm shadow-sm focus:ring-2 focus:ring-blue-500 transition-all outline-none ${

@@ -39,3 +39,11 @@ export interface CreatePlanItemRequest {
   memo?: string
   orderIndex?: number
 }
+
+export interface UpdateTravelRequest {
+  title?: string
+  startDate?: string
+  endDate?: string
+  regionName?: string
+  isPublic?: boolean
+}

@@ -31,6 +31,24 @@ data class TravelResponse(
     val isPublic: Boolean
 )
 
+@Schema(description = "여행 수정 요청")
+data class TravelUpdateRequest(
+    @Schema(description = "여행 제목", example = "수정된 제주도 여행")
+    val title: String? = null,
+
+    @Schema(description = "시작일", example = "2025-03-01")
+    val startDate: LocalDate? = null,
+
+    @Schema(description = "종료일", example = "2025-03-04")
+    val endDate: LocalDate? = null,
+
+    @Schema(description = "지역명", example = "제주도, 성산")
+    val regionName: String? = null,
+
+    @Schema(description = "공개 여부", example = "true")
+    val isPublic: Boolean? = null
+)
+
 @Schema(description = "일정 생성/수정 요청")
 data class PlanCreateRequest(
     @Schema(description = "날짜", example = "2025-03-01")

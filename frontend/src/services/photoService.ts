@@ -42,4 +42,9 @@ export const photoService = {
     const response = await apiClient.post<{ id: string }>(`/travels/${travelId}/photos`, data)
     return response.data
   },
+
+  // 사진 삭제
+  delete: async (travelId: string, photoId: string): Promise<void> => {
+    await apiClient.delete(`/travels/${travelId}/photos/${photoId}`)
+  },
 }

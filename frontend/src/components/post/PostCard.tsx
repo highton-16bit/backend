@@ -49,7 +49,10 @@ export default function PostCard({ post, onLike, onBookmark, onShare, onClone }:
               onClick={onLike}
               className="flex items-center gap-1.5 hover:scale-110 transition-transform"
             >
-              <Heart size={22} className="text-slate-700" />
+              <Heart
+                size={22}
+                className={post.isLiked ? 'text-red-500 fill-red-500' : 'text-slate-700'}
+              />
               <span className="text-[10px] font-black">{post.likeCount}</span>
             </button>
             <button
@@ -64,7 +67,10 @@ export default function PostCard({ post, onLike, onBookmark, onShare, onClone }:
             </button>
           </div>
           <button onClick={onBookmark} className="hover:scale-110 transition-transform">
-            <Bookmark size={22} className="text-slate-700" />
+            <Bookmark
+              size={22}
+              className={post.isBookmarked ? 'text-blue-600 fill-blue-600' : 'text-slate-700'}
+            />
           </button>
         </div>
 

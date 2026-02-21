@@ -52,6 +52,20 @@ class TravelService(
         travelRepository.deleteById(id)
     }
 
+    @Transactional
+    fun update(id: UUID, userId: UUID, request: TravelUpdateRequest) {
+        val travel = travelRepository.findById(id)
+            .orElseThrow { IllegalArgumentException("Travel not found") }
+
+        require(travel.user.id == userId) { "Unauthorized: You can only edit your own travel" }
+
+        request.title?.let { travel.title = it }
+        request.startDate?.let { travel.startDate = it }
+        request.endDate?.let { travel.endDate = it }
+        request.regionName?.let { travel.regionName = it }
+        request.isPublic?.let { travel.isPublic = it }
+    }
+
     // Plan Items
     fun findPlansByTravelId(travelId: UUID): List<PlanResponse> {
         return planItemRepository.findByTravelIdOrderByDateAscStartTimeAsc(travelId)

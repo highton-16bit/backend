@@ -1,5 +1,5 @@
 import { apiClient } from './api'
-import type { Post, CreatePostRequest } from '../types'
+import type { Post, CreatePostRequest, UpdatePostRequest } from '../types'
 
 interface PostListResponse {
   posts: Post[]
@@ -38,5 +38,15 @@ export const postService = {
   getBookmarks: async (): Promise<Post[]> => {
     const response = await apiClient.get<PostListResponse>('/posts/bookmarks')
     return response.data.posts
+  },
+
+  // 게시글 수정
+  update: async (id: string, data: UpdatePostRequest): Promise<void> => {
+    await apiClient.patch(`/posts/${id}`, data)
+  },
+
+  // 게시글 삭제
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/posts/${id}`)
   },
 }

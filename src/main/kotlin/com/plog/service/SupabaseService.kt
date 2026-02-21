@@ -7,6 +7,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
 import java.net.URI
 import java.util.*
@@ -57,6 +58,29 @@ class SupabaseService(
         } catch (e: Exception) {
             println("Supabase S3 업로드 실패: ${e.message}")
             null
+        }
+    }
+
+    fun delete(imageUrl: String): Boolean {
+        val client = s3Client ?: return false
+
+        // URL에서 파일 키 추출: .../public/bucket/key -> key
+        val key = imageUrl.substringAfterLast("/$bucketName/")
+        if (key == imageUrl || key.isBlank()) {
+            return false
+        }
+
+        return try {
+            val deleteRequest = DeleteObjectRequest.builder()
+                .bucket(bucketName)
+                .key(key)
+                .build()
+
+            client.deleteObject(deleteRequest)
+            true
+        } catch (e: Exception) {
+            println("Supabase S3 삭제 실패: ${e.message}")
+            false
         }
     }
 }
