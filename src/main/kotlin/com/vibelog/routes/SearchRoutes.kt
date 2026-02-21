@@ -32,7 +32,7 @@ fun Route.searchRoutes(apiKey: String) {
             val q = call.request.queryParameters["q"] ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing query")
             
             val dbPosts = dbQuery {
-                Posts.selectAll().where { Posts.contentSummary.ilike("%$q%") }
+                Posts.selectAll().where { Posts.contentSummary.lowerCase() like "%${q.lowercase()}%" }
                     .limit(3)
                     .map { row ->
                         mapOf(

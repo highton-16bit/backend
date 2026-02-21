@@ -36,4 +36,4 @@ fun Application.configureDatabase() {
 }
 
 suspend fun <T> dbQuery(block: suspend () -> T): T =
-    org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction(kotlin.coroutines.Dispatchers.IO) { block() }
+    org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction(kotlinx.coroutines.Dispatchers.IO) { block() }
