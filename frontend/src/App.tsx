@@ -364,6 +364,14 @@ function TravelsTab({ travels, onRefresh }: any) {
     }
   }
 
+  const handleDeletePlan = async (planId: string) => {
+    if (!selectedId || !confirm("이 일정을 삭제할까요?")) return
+    try {
+      await axios.delete(`${API_URL}/travels/${selectedId}/plans/${planId}`)
+      handleDetail(selectedId)
+    } catch (e) { alert("삭제 실패") }
+  }
+
   if (selectedId) return (
     <div className="p-6 space-y-8 animate-in slide-in-from-right-4">
       <button onClick={() => setSelectedId(null)} className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase"><X size={16}/> Back</button>
@@ -440,9 +448,15 @@ function TravelsTab({ travels, onRefresh }: any) {
                       {Array.from(new Set(plans.map(p => p.date))).sort().map(date => {
                         const planInSlot = plans.find(p => p.date === date && p.startTime?.startsWith(hour));
                         return (
-                          <div key={`${date}-${hour}`} className="flex-1 min-w-[120px] p-1 border-r border-gray-100 last:border-r-0 min-h-[50px] relative">
+                          <div key={`${date}-${hour}`} className="flex-1 min-w-[120px] p-1 border-r border-gray-100 last:border-r-0 min-h-[50px] relative group/item">
                             {planInSlot && (
                               <div className="bg-blue-50 border border-blue-100 rounded-xl p-2 h-full flex flex-col justify-center animate-in zoom-in-95">
+                                <button 
+                                  onClick={() => handleDeletePlan(planInSlot.id)}
+                                  className="absolute top-1 right-1 bg-white/80 text-red-500 p-1 rounded-full opacity-0 group-hover/item:opacity-100 transition-opacity z-10 shadow-sm"
+                                >
+                                  <X size={10} />
+                                </button>
                                 <p className="text-[8px] font-black text-blue-600 uppercase mb-0.5">{planInSlot.startTime}</p>
                                 <p className="text-[10px] font-bold text-slate-800 leading-tight line-clamp-2">{planInSlot.memo}</p>
                               </div>

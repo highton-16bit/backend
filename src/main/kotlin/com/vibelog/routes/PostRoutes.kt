@@ -7,12 +7,12 @@ import io.ktor.server.routing.*
 import io.ktor.http.*
 import com.vibelog.models.*
 import com.vibelog.plugins.dbQuery
+import com.vibelog.services.GeminiService
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import java.util.*
-import kotlinx.datetime.LocalDate
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -22,10 +22,10 @@ data class PostCreateRequest(
     val photoIds: List<String>
 )
 
-fun Route.postRoutes() {
+fun Route.postRoutes(geminiService: GeminiService) {
     route("/posts") {
         
-        // 피드 조회 (좋아요, 클론 횟수 포함)
+        // 피드 조회
         get {
             val posts = dbQuery {
                 Posts.selectAll()
@@ -44,29 +44,34 @@ fun Route.postRoutes() {
             call.respond(posts)
         }
 
-        // 게시글 생성 (Static Flattening 반영)
+        // 게시글 생성 (Gemini AI Flattening 연동)
         post {
             val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val request = call.receive<PostCreateRequest>()
             val travelId = UUID.fromString(request.travelId)
             
-            val plans = dbQuery {
+            val plansRaw = dbQuery {
                 TravelPlanItems.selectAll().where { TravelPlanItems.travelId eq travelId }
                     .orderBy(TravelPlanItems.date to SortOrder.ASC)
                     .orderBy(TravelPlanItems.startTime to SortOrder.ASC)
                     .map { row ->
-                        val date = row[TravelPlanItems.date]
-                        val start = row[TravelPlanItems.startTime] ?: ""
-                        val end = row[TravelPlanItems.endTime] ?: ""
-                        val memo = row[TravelPlanItems.memo] ?: "일정"
-                        "$date 일정\n- $start ~ $end : $memo"
+                        "${row[TravelPlanItems.date]} ${row[TravelPlanItems.startTime] ?: ""} : ${row[TravelPlanItems.memo] ?: "일정"}"
                     }
             }
             
-            val staticSummary = if (plans.isNotEmpty()) {
-                plans.joinToString("\n")
-            } else {
-                "등록된 여행 일정이 없습니다."
+            val prompt = """
+                다음은 사용자의 여행 일정 목록입니다:
+                ${plansRaw.joinToString("\n")}
+                
+                이 일정들을 바탕으로, 인스타그램에 올릴 만한 감성적이고 따뜻한 여행 에세이(본문)를 작성해주세요. 
+                너무 길지 않게 3~5문장 정도로 작성해주고, 해시태그도 2~3개 포함해주세요.
+                이모지도 적절히 섞어주세요.
+            """.trimIndent()
+
+            val aiSummary = try {
+                geminiService.generateText(prompt)
+            } catch (e: Exception) {
+                plansRaw.joinToString("\n")
             }
 
             val newPostId = dbQuery {
@@ -74,7 +79,7 @@ fun Route.postRoutes() {
                     it[Posts.travelId] = travelId
                     it[Posts.userId] = userId
                     it[Posts.title] = request.title
-                    it[Posts.contentSummary] = staticSummary
+                    it[Posts.contentSummary] = aiSummary
                 } get Posts.id
                 
                 request.photoIds.forEach { photoId ->
@@ -86,10 +91,10 @@ fun Route.postRoutes() {
                 postId
             }
             
-            call.respond(HttpStatusCode.Created, mapOf("id" to newPostId.toString(), "summary" to staticSummary))
+            call.respond(HttpStatusCode.Created, mapOf("id" to newPostId.toString(), "summary" to aiSummary))
         }
 
-        // 좋아요 토글 (Like/Unlike Toggle)
+        // 좋아요 토글
         post("/{id}/like") {
             val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val postId = UUID.fromString(call.parameters["id"])
@@ -107,7 +112,7 @@ fun Route.postRoutes() {
             call.respond(HttpStatusCode.OK)
         }
 
-        // 북마크 토글 (Bookmark Toggle)
+        // 북마크 토글
         post("/{id}/bookmark") {
             val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val postId = UUID.fromString(call.parameters["id"])
@@ -123,7 +128,7 @@ fun Route.postRoutes() {
             call.respond(HttpStatusCode.OK)
         }
 
-        // 내 북마크 조회
+        // 북마크 목록
         get("/bookmarks") {
             val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val bookmarkedPosts = dbQuery {

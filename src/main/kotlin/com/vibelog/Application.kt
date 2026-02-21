@@ -10,6 +10,7 @@ import kotlinx.serialization.json.Json
 import com.vibelog.plugins.*
 import com.vibelog.routes.*
 import com.vibelog.services.SupabaseService
+import com.vibelog.services.GeminiService
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
@@ -39,6 +40,7 @@ fun Application.configureCORS() {
         allowMethod(io.ktor.http.HttpMethod.Get)
         allowMethod(io.ktor.http.HttpMethod.Post)
         allowMethod(io.ktor.http.HttpMethod.Put)
+        allowMethod(io.ktor.http.HttpMethod.Patch) // PATCH 추가
         allowMethod(io.ktor.http.HttpMethod.Delete)
     }
 }
@@ -55,6 +57,7 @@ fun Application.configureSerialization() {
 
 fun Application.configureRouting(supabaseService: SupabaseService) {
     val geminiApiKey = environment.config.propertyOrNull("gemini.apiKey")?.getString() ?: ""
+    val geminiService = GeminiService(geminiApiKey)
     
     routing {
         get("/") {
@@ -63,8 +66,8 @@ fun Application.configureRouting(supabaseService: SupabaseService) {
         
         authRoutes()
         travelRoutes()
-        postRoutes()
-        searchRoutes(geminiApiKey)
+        postRoutes(geminiService)
+        searchRoutes(geminiService)
         photoRoutes(supabaseService)
     }
 }

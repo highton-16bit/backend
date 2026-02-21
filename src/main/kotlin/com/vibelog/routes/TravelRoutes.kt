@@ -111,5 +111,35 @@ fun Route.travelRoutes() {
             }
             call.respond(HttpStatusCode.Created, mapOf("id" to newPlanId.toString()))
         }
+
+        patch("/{id}/plans/{planId}") {
+            val planId = UUID.fromString(call.parameters["planId"])
+            val request = call.receive<PlanItemCreateRequest>()
+
+            if (request.startTime != null && request.endTime != null) {
+                if (request.startTime > request.endTime) {
+                    return@patch call.respond(HttpStatusCode.BadRequest, "Start time must be earlier than end time")
+                }
+            }
+
+            dbQuery {
+                TravelPlanItems.update({ TravelPlanItems.id eq planId }) {
+                    it[TravelPlanItems.date] = LocalDate.parse(request.date)
+                    it[TravelPlanItems.startTime] = request.startTime
+                    it[TravelPlanItems.endTime] = request.endTime
+                    it[TravelPlanItems.memo] = request.memo
+                    it[TravelPlanItems.orderIndex] = request.orderIndex
+                }
+            }
+            call.respond(HttpStatusCode.OK)
+        }
+
+        delete("/{id}/plans/{planId}") {
+            val planId = UUID.fromString(call.parameters["planId"])
+            dbQuery {
+                TravelPlanItems.deleteWhere { TravelPlanItems.id eq planId }
+            }
+            call.respond(HttpStatusCode.OK)
+        }
     }
 }
