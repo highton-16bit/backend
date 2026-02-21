@@ -402,27 +402,55 @@ function TravelsTab({ travels, onRefresh }: any) {
                <button onClick={handleAddPlan} className="bg-blue-600 text-white p-4 rounded-xl font-black text-xs shadow-lg shadow-blue-100 active:scale-95 transition-all">Add Plan</button>
              </div>
           </div>
-          <div className="space-y-4">
-             {plans.map((p: any) => (
-               <div key={p.id} className="flex gap-4 group">
-                  <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shadow-sm"><Clock size={16}/></div>
-                    <div className="w-0.5 h-full bg-slate-100 my-1 group-last:hidden"></div>
+
+          {/* Timetable Grid View */}
+          <div className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto scrollbar-hide">
+              <div className="min-w-[400px]">
+                {/* Header Row (Days) */}
+                <div className="flex border-b border-gray-50 bg-slate-50/50">
+                  <div className="w-16 flex-shrink-0 border-r border-gray-100 p-3 flex items-center justify-center">
+                    <Clock size={14} className="text-slate-400" />
                   </div>
-                  <div className="pb-8 flex-1">
-                    <div className="flex justify-between items-center mb-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.date}</p>
-                      {(p.startTime || p.endTime) && (
-                        <p className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                          {p.startTime || '--:--'} ~ {p.endTime || '--:--'}
-                        </p>
-                      )}
+                  {Array.from(new Set(plans.map(p => p.date))).sort().map(date => (
+                    <div key={date} className="flex-1 min-w-[120px] p-3 text-center border-r border-gray-100 last:border-r-0">
+                      <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mb-0.5">Day</p>
+                      <p className="text-[10px] font-black text-slate-800 tracking-tight">{date.split('-').slice(1).join('/')}</p>
                     </div>
-                    <p className="font-bold text-slate-800 text-sm leading-tight">{p.memo}</p>
-                  </div>
-               </div>
-             ))}
+                  ))}
+                  {plans.length === 0 && <div className="flex-1 p-3 text-center text-[10px] font-bold text-slate-400">등록된 일정이 없습니다</div>}
+                </div>
+
+                {/* Body (Time Slots) */}
+                <div className="max-h-[400px] overflow-y-auto scrollbar-hide">
+                  {["08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"].map(hour => (
+                    <div key={hour} className="flex border-b border-gray-50 last:border-b-0">
+                      {/* Time Label */}
+                      <div className="w-16 flex-shrink-0 border-r border-gray-100 p-2 flex items-center justify-center">
+                        <span className="text-[10px] font-black text-slate-400">{hour}:00</span>
+                      </div>
+                      
+                      {/* Plans for each Day */}
+                      {Array.from(new Set(plans.map(p => p.date))).sort().map(date => {
+                        const planInSlot = plans.find(p => p.date === date && p.startTime?.startsWith(hour));
+                        return (
+                          <div key={`${date}-${hour}`} className="flex-1 min-w-[120px] p-1 border-r border-gray-100 last:border-r-0 min-h-[50px] relative">
+                            {planInSlot && (
+                              <div className="bg-blue-50 border border-blue-100 rounded-xl p-2 h-full flex flex-col justify-center animate-in zoom-in-95">
+                                <p className="text-[8px] font-black text-blue-600 uppercase mb-0.5">{planInSlot.startTime}</p>
+                                <p className="text-[10px] font-bold text-slate-800 leading-tight line-clamp-2">{planInSlot.memo}</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
+          <p className="text-[9px] font-bold text-slate-400 text-center px-4 uppercase tracking-widest italic">Tip: 가로로 스크롤하여 날짜별 일정을 확인하세요</p>
         </div>
       )}
     </div>
