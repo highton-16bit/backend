@@ -13,6 +13,7 @@ import io.ktor.serialization.kotlinx.json.*
 import com.vibelog.models.*
 import com.vibelog.plugins.dbQuery
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
 import java.util.*
 import kotlinx.serialization.json.*
 
@@ -65,6 +66,7 @@ fun Route.searchRoutes(apiKey: String) {
             }
         }
 
+        // 스마트 클로닝 (AI 파싱 - 텍스트를 JSON 일정으로 변환 + 클론 횟수 증가)
         post("/clone/{id}") {
             val postId = UUID.fromString(call.parameters["id"])
             
@@ -106,6 +108,12 @@ fun Route.searchRoutes(apiKey: String) {
                     val jsonStart = parsedText.indexOf("{")
                     val jsonEnd = parsedText.lastIndexOf("}") + 1
                     val jsonResult = Json.parseToJsonElement(parsedText.substring(jsonStart, jsonEnd)).jsonObject
+                    
+                    // 클론 횟수 증가 (성공 시에만)
+                    dbQuery {
+                        Posts.update({ Posts.id eq postId }) { it[cloneCount] = cloneCount + 1 }
+                    }
+                    
                     call.respond(jsonResult)
                 } catch (e: Exception) {
                     call.respond(HttpStatusCode.InternalServerError, "Failed to parse travel plan via AI")

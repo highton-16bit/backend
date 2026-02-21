@@ -29,19 +29,19 @@ object Travels : Table("travels") {
     override val primaryKey = PrimaryKey(id)
 }
 
-// 3. 여행 상세 계획 (placeName 제거)
+// 3. 여행 상세 계획
 object TravelPlanItems : Table("travel_plan_items") {
     val id = uuid("id").clientDefault { UUID.randomUUID() }
     val travelId = uuid("travel_id").references(Travels.id, onDelete = ReferenceOption.CASCADE)
     val date = date("date")
-    val startTime = text("start_time").nullable() // HH:mm
-    val endTime = text("end_time").nullable() // HH:mm
-    val memo = text("memo").nullable() // 이제 핵심 내용이 메모에 담김
+    val startTime = text("start_time").nullable()
+    val endTime = text("end_time").nullable()
+    val memo = text("memo").nullable()
     val orderIndex = integer("order_index").default(0)
     override val primaryKey = PrimaryKey(id)
 }
 
-// 4. 여행 사진 (Snapshot)
+// 4. 여행 사진
 object TravelPhotos : Table("travel_photos") {
     val id = uuid("id").clientDefault { UUID.randomUUID() }
     val travelId = uuid("travel_id").references(Travels.id)
@@ -51,7 +51,7 @@ object TravelPhotos : Table("travel_photos") {
     override val primaryKey = PrimaryKey(id)
 }
 
-// 5. 게시글
+// 5. 게시글 (cloneCount 추가)
 object Posts : Table("posts") {
     val id = uuid("id").clientDefault { UUID.randomUUID() }
     val travelId = uuid("travel_id").references(Travels.id)
@@ -59,8 +59,24 @@ object Posts : Table("posts") {
     val title = text("title")
     val contentSummary = text("content_summary").nullable()
     val likeCount = integer("like_count").default(0)
+    val cloneCount = integer("clone_count").default(0) // 클론 횟수 추가
     val createdAt = datetime("created_at").defaultExpression(CurrentDateTime)
     override val primaryKey = PrimaryKey(id)
+}
+
+// 6. 좋아요 (Likes) - 유저 중복 방지
+object PostLikes : Table("post_likes") {
+    val userId = uuid("user_id").references(Users.id)
+    val postId = uuid("post_id").references(Posts.id, onDelete = ReferenceOption.CASCADE)
+    override val primaryKey = PrimaryKey(userId, postId)
+}
+
+// 7. 북마크 (Bookmarks)
+object Bookmarks : Table("bookmarks") {
+    val userId = uuid("user_id").references(Users.id)
+    val postId = uuid("post_id").references(Posts.id, onDelete = ReferenceOption.CASCADE)
+    val createdAt = datetime("created_at").defaultExpression(CurrentDateTime)
+    override val primaryKey = PrimaryKey(userId, postId)
 }
 
 object PostPhotoMappings : Table("post_photo_mappings") {

@@ -8,6 +8,8 @@ import io.ktor.http.*
 import com.vibelog.models.*
 import com.vibelog.plugins.dbQuery
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.plus
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.minus
 import java.util.*
 import kotlinx.serialization.Serializable
 
@@ -21,6 +23,7 @@ data class PostCreateRequest(
 fun Route.postRoutes() {
     route("/posts") {
         
+        // 피드 조회 (좋아요, 클론 횟수 포함)
         get {
             val posts = dbQuery {
                 Posts.selectAll()
@@ -31,6 +34,7 @@ fun Route.postRoutes() {
                             "title" to row[Posts.title],
                             "contentSummary" to row[Posts.contentSummary],
                             "likeCount" to row[Posts.likeCount],
+                            "cloneCount" to row[Posts.cloneCount],
                             "createdAt" to row[Posts.createdAt].toString()
                         )
                     }
@@ -38,12 +42,12 @@ fun Route.postRoutes() {
             call.respond(posts)
         }
 
+        // 게시글 생성 (Static Flattening 반영)
         post {
             val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
             val request = call.receive<PostCreateRequest>()
             val travelId = UUID.fromString(request.travelId)
             
-            // 1. 여행 일정 데이터 조회
             val plans = dbQuery {
                 TravelPlanItems.select { TravelPlanItems.travelId eq travelId }
                     .orderBy(TravelPlanItems.date to SortOrder.ASC)
@@ -81,6 +85,59 @@ fun Route.postRoutes() {
             }
             
             call.respond(HttpStatusCode.Created, mapOf("id" to newPostId.toString(), "summary" to staticSummary))
+        }
+
+        // 좋아요 토글 (Like/Unlike Toggle)
+        post("/{id}/like") {
+            val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
+            val postId = UUID.fromString(call.parameters["id"])
+            
+            dbQuery {
+                val existingLike = PostLikes.select { (PostLikes.userId eq userId) and (PostLikes.postId eq postId) }.singleOrNull()
+                if (existingLike == null) {
+                    PostLikes.insert { it[PostLikes.userId] = userId; it[PostLikes.postId] = postId }
+                    Posts.update({ Posts.id eq postId }) { it[likeCount] = likeCount + 1 }
+                } else {
+                    PostLikes.deleteWhere { (PostLikes.userId eq userId) and (PostLikes.postId eq postId) }
+                    Posts.update({ Posts.id eq postId }) { it[likeCount] = likeCount - 1 }
+                }
+            }
+            call.respond(HttpStatusCode.OK)
+        }
+
+        // 북마크 토글 (Bookmark Toggle)
+        post("/{id}/bookmark") {
+            val userId = call.getUserIdFromHeader() ?: return@post call.respond(HttpStatusCode.Unauthorized, "Invalid User")
+            val postId = UUID.fromString(call.parameters["id"])
+            
+            dbQuery {
+                val existingBookmark = Bookmarks.select { (Bookmarks.userId eq userId) and (Bookmarks.postId eq postId) }.singleOrNull()
+                if (existingBookmark == null) {
+                    Bookmarks.insert { it[userId] = userId; it[postId] = postId }
+                } else {
+                    Bookmarks.deleteWhere { (Bookmarks.userId eq userId) and (Bookmarks.postId eq postId) }
+                }
+            }
+            call.respond(HttpStatusCode.OK)
+        }
+
+        // 내 북마크 조회
+        get("/bookmarks") {
+            val userId = call.getUserIdFromHeader() ?: return@get call.respond(HttpStatusCode.Unauthorized, "Invalid User")
+            val bookmarkedPosts = dbQuery {
+                (Bookmarks innerJoin Posts).select { Bookmarks.userId eq userId }
+                    .orderBy(Bookmarks.createdAt to SortOrder.DESC)
+                    .map { row ->
+                        mapOf(
+                            "id" to row[Posts.id].toString(),
+                            "title" to row[Posts.title],
+                            "contentSummary" to row[Posts.contentSummary],
+                            "likeCount" to row[Posts.likeCount],
+                            "cloneCount" to row[Posts.cloneCount]
+                        )
+                    }
+            }
+            call.respond(bookmarkedPosts)
         }
     }
 }
