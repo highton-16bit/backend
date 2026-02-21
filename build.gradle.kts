@@ -65,3 +65,34 @@ allOpen {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// Frontend Build Tasks
+val frontendDir = file("frontend")
+val frontendBuildDir = file("frontend/dist")
+val staticDir = file("src/main/resources/static")
+
+tasks.register<Exec>("npmInstall") {
+    workingDir = frontendDir
+    commandLine = listOf("npm", "install")
+}
+
+tasks.register<Exec>("npmBuild") {
+    dependsOn("npmInstall")
+    workingDir = frontendDir
+    commandLine = listOf("npm", "run", "build")
+}
+
+tasks.register<Copy>("copyFrontend") {
+    dependsOn("npmBuild")
+    from(frontendBuildDir)
+    into(staticDir)
+}
+
+tasks.named("processResources") {
+    dependsOn("copyFrontend")
+}
+
+// 클린 시 static 폴더도 삭제
+tasks.named<Delete>("clean") {
+    delete(staticDir)
+}

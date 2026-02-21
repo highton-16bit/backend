@@ -24,9 +24,7 @@ class TravelController(
         @Parameter(description = "사용자명 (Authorization 헤더)")
         @RequestHeader("Authorization") username: String
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         return ResponseEntity.ok(travelService.findByUserId(user.id))
     }
@@ -36,9 +34,7 @@ class TravelController(
     fun getActiveTravel(
         @RequestHeader("Authorization") username: String
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         val active = travelService.findActiveTravel(user.id)
         return if (active != null) {
@@ -64,9 +60,7 @@ class TravelController(
         @RequestHeader("Authorization") username: String,
         @RequestBody request: TravelCreateRequest
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         val id = travelService.create(user, request)
         return ResponseEntity.status(HttpStatus.CREATED).body(IdResponse(id))
@@ -87,9 +81,7 @@ class TravelController(
         @PathVariable id: UUID,
         @RequestBody request: TravelUpdateRequest
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         return try {
             travelService.update(id, user.id, request)

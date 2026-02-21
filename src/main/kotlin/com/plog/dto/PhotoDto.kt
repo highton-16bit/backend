@@ -2,22 +2,18 @@ package com.plog.dto
 
 import io.swagger.v3.oas.annotations.media.Schema
 
-@Schema(description = "사진 메타데이터 요청")
-data class PhotoMetadataRequest(
-    @Schema(description = "이미지 URL")
+@Schema(description = "사진 URL 등록 요청")
+data class PhotoUrlRequest(
+    @Schema(description = "이미지 URL (S3 업로드 후 반환된 URL)")
     val imageUrl: String,
 
     @Schema(description = "스냅샷 여부")
-    val isSnapshot: Boolean = false,
+    val isSnapshot: Boolean = false
+)
 
-    @Schema(description = "위도")
-    val latitude: Double? = null,
-
-    @Schema(description = "경도")
-    val longitude: Double? = null,
-
-    @Schema(description = "촬영 시간")
-    val capturedAt: String? = null
+@Schema(description = "S3 업로드 응답")
+data class S3UploadResponse(
+    val url: String
 )
 
 @Schema(description = "사진 응답")

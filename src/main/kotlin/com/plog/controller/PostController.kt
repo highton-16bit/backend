@@ -66,9 +66,7 @@ class PostController(
         @RequestHeader("Authorization") username: String,
         @RequestBody request: PostCreateRequest
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         val travelId = try {
             UUID.fromString(request.travelId)
@@ -102,9 +100,7 @@ class PostController(
         @PathVariable id: UUID,
         @RequestBody request: PostUpdateRequest
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         return try {
             postService.update(id, user.id, request)
@@ -128,9 +124,7 @@ class PostController(
         @RequestHeader("Authorization") username: String,
         @PathVariable id: UUID
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         return try {
             postService.delete(id, user.id)
@@ -146,9 +140,7 @@ class PostController(
         @RequestHeader("Authorization") username: String,
         @PathVariable id: UUID
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         val post = postService.getPostEntity(id)
             ?: return ResponseEntity.badRequest().body(MessageResponse("Invalid ID"))
@@ -163,9 +155,7 @@ class PostController(
         @RequestHeader("Authorization") username: String,
         @PathVariable id: UUID
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         val post = postService.getPostEntity(id)
             ?: return ResponseEntity.badRequest().body(MessageResponse("Invalid ID"))
@@ -179,9 +169,7 @@ class PostController(
     fun getBookmarks(
         @RequestHeader("Authorization") username: String
     ): ResponseEntity<Any> {
-        val user = userService.findByUsername(username)
-            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(MessageResponse("Unauthorized"))
+        val user = userService.getOrCreate(username)
 
         return ResponseEntity.ok(PostListResponse(posts = postService.findBookmarkedPosts(user.id)))
     }

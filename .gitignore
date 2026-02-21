@@ -3,6 +3,7 @@ build/
 out/
 frontend/dist/
 frontend/node_modules/
+src/main/resources/static/
 
 # Gradle
 .gradle/
