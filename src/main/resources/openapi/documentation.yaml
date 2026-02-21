@@ -1,20 +1,35 @@
 openapi: 3.0.3
 info:
-  title: Plog API Documentation
-  description: "나를 가장 행복하게 하는 순간을 기록하는 지능형 여행 플랫폼 Plog의 API 명세서입니다."
-  version: 1.0.0
+  title: Plog API Documentation (Ultimate Guide)
+  description: |
+    # 📸 Plog: Happiness Archiving Platform
+    나를 가장 행복하게 하는 순간(Snapshot)을 기록하고 AI로 새로운 행복을 설계하는 지능형 여행 플랫폼 **Plog**의 공식 API 명세서입니다.
+    
+    ## 🔐 인증 방식 (Authentication)
+    - **Method:** `Authorization` 헤더 기반 초간편 인증 (Password-less)
+    - **Header:** `Authorization: {username}`
+    - **Usage:** 모든 API 호출 시 헤더에 `username`을 포함해야 합니다. 해당 유저가 존재하지 않으면 `/auth` 호출 시 자동으로 회원가입 처리됩니다.
+
+    ## 🚀 주요 도메인 흐름
+    1. **Auth:** 유저 등록 및 세션 유지
+    2. **Travel:** 여행 대장 생성 -> 상세 일정(Plan) 추가 -> 여행 중 사진(Photo) 업로드
+    3. **Post:** 여행 완료 또는 진행 중, 사진들을 묶어 피드에 공유 (AI가 일정을 요약하여 본문 자동 생성)
+    4. **Search:** AI 기반 자연어 검색 및 타인의 일정 클로닝(복제)
+  version: 1.2.0
 servers:
   - url: https://16bit-api-production.up.railway.app
-    description: Production Server
+    description: 운영 서버 (Production)
   - url: http://localhost:8080
-    description: Local Development
+    description: 로컬 개발 서버 (Local)
+
 components:
   securitySchemes:
     UsernameAuth:
       type: apiKey
       in: header
       name: Authorization
-      description: "사용자 식별을 위한 유저네임 (예: daybreak)"
+      description: "사용자 식별용 유저네임 (예: daybreak)"
+
 security:
   - UsernameAuth: []
 
@@ -22,6 +37,7 @@ paths:
   /auth:
     post:
       summary: "로그인 및 자동 회원가입"
+      description: "입력한 username이 DB에 없으면 신규 생성, 있으면 기존 유저로 인식합니다. 별도의 비밀번호는 없습니다."
       tags: [Auth]
       requestBody:
         required: true
@@ -30,18 +46,31 @@ paths:
             schema:
               type: object
               properties:
-                username: { type: string }
+                username: 
+                  type: string
+                  description: "사용자 고유 식별자"
+                  example: "daybreak"
       responses:
-        200: { description: "성공" }
+        200:
+          description: "성공"
 
   /travels:
     get:
       summary: "내 여행 목록 조회"
+      description: "내가 생성한 모든 여행 정보를 최신순으로 반환합니다. '내 여행' 탭의 리스트 구현 시 사용합니다."
       tags: [Travel]
       responses:
-        200: { description: "성공" }
+        200:
+          description: "성공"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TravelDTO'
     post:
       summary: "새 여행 생성"
+      description: "신규 여행 대장을 생성합니다. 시작일과 종료일은 'YYYY-MM-DD' 형식을 준수해야 합니다."
       tags: [Travel]
       requestBody:
         required: true
@@ -50,33 +79,54 @@ paths:
             schema:
               type: object
               properties:
-                title: { type: string }
-                startDate: { type: string, example: "2026-02-21" }
-                endDate: { type: string, example: "2026-02-23" }
-                regionName: { type: string }
+                title: 
+                  type: string
+                  description: "여행 제목"
+                  example: "제주도 힐링 투어"
+                startDate: 
+                  type: string
+                  description: "여행 시작일 (ISO 8601)"
+                  example: "2026-02-21"
+                endDate: 
+                  type: string
+                  description: "여행 종료일 (ISO 8601)"
+                  example: "2026-02-23"
+                regionName: 
+                  type: string
+                  description: "여행 지역명"
+                  example: "제주 서귀포시"
       responses:
-        201: { description: "생성됨" }
+        201:
+          description: "생성됨"
 
   /travels/active:
     get:
       summary: "현재 진행 중인 여행 정보 조회"
+      description: "오늘 날짜가 startDate와 endDate 사이에 있는 여행 중 가장 최근에 생성된 하나를 반환합니다. 홈 화면 상단 카드에 노출됩니다."
       tags: [Travel]
       responses:
-        200: { description: "성공" }
+        200:
+          description: "성공 (없을 경우 null 반환 가능)"
 
   /travels/{id}/plans:
     get:
       summary: "특정 여행의 상세 일정 조회"
+      description: "여행 대장에 속한 날짜별/시간별 상세 스케줄을 조회합니다."
       tags: [Travel]
       parameters:
         - name: id
           in: path
           required: true
+          description: "여행(Travel) 고유 UUID"
           schema: { type: string, format: uuid }
       responses:
-        200: { description: "성공" }
+        200:
+          description: "성공"
     post:
       summary: "상세 일정 추가"
+      description: |
+        특정 여행 날짜에 할 일을 추가합니다. 
+        **주의:** startTime은 endTime보다 반드시 빨라야 합니다 (24시간 형식).
       tags: [Travel]
       parameters:
         - name: id
@@ -90,88 +140,33 @@ paths:
             schema:
               type: object
               properties:
-                date: { type: string }
-                startTime: { type: string }
-                endTime: { type: string }
-                memo: { type: string }
+                date: 
+                  type: string
+                  example: "2026-02-21"
+                startTime: 
+                  type: string
+                  description: "시작 시간 (HH:mm)"
+                  example: "09:00"
+                endTime: 
+                  type: string
+                  description: "종료 시간 (HH:mm)"
+                  example: "11:30"
+                memo: 
+                  type: string
+                  description: "활동 내용"
+                  example: "성산일출봉 산책"
       responses:
         201: { description: "생성됨" }
-
-  /posts:
-    get:
-      summary: "전체 게시글 피드 조회 (인스타그램 홈 스타일)"
-      tags: [Post]
-      responses:
-        200: { description: "성공" }
-    post:
-      summary: "게시글 작성 (Flattening 자동 적용)"
-      tags: [Post]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                travelId: { type: string, format: uuid }
-                title: { type: string }
-                photoIds:
-                  type: array
-                  items: { type: string, format: uuid }
-      responses:
-        201: { description: "생성됨" }
-
-  /posts/{id}/like:
-    post:
-      summary: "좋아요 토글"
-      tags: [Post]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        200: { description: "성공" }
-
-  /posts/{id}/bookmark:
-    post:
-      summary: "북마크 토글"
-      tags: [Post]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        200: { description: "성공" }
-
-  /search/ai:
-    get:
-      summary: "Gemini AI 기반 자연어 검색"
-      tags: [Search]
-      parameters:
-        - name: q
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        200: { description: "성공" }
-
-  /search/clone/{id}:
-    post:
-      summary: "스마트 클로닝 (AI 일정 파싱)"
-      tags: [Search]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        200: { description: "성공" }
+        400: { description: "시간 유효성 검사 실패 (시작 > 종료)" }
 
   /photos/upload:
     post:
-      summary: "사진 업로드 (S3 Proxy)"
+      summary: "사진 업로드 및 DB 자동 등록"
+      description: |
+        멀티파트로 사진을 전송하면 서버가 다음 과정을 수행합니다:
+        1. **S3 업로드:** 사진을 클라우드에 저장.
+        2. **EXIF 분석:** 사진에서 GPS(위도, 경도)와 촬영시간을 자동 추출.
+        3. **DB 저장:** 해당 정보를 `travel_photos` 테이블에 즉시 기록.
       tags: [Photo]
       requestBody:
         content:
@@ -179,29 +174,46 @@ paths:
             schema:
               type: object
               properties:
-                file: { type: string, format: binary }
+                file: 
+                  type: string
+                  format: binary
+                  description: "이미지 파일 (JPEG, PNG 권장)"
+                travelId: 
+                  type: string
+                  format: uuid
+                  description: "이 사진이 속할 여행의 ID"
+                isSnapshot: 
+                  type: boolean
+                  description: "여행 중 실시간 기록(스냅샷) 여부"
+                  example: true
       responses:
-        200: { description: "성공" }
+        200:
+          description: "업로드 및 분석 성공"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, description: "저장된 사진 ID" }
+                  url: { type: string, description: "S3 공개 URL" }
+                  latitude: { type: number, description: "추출된 위도" }
+                  longitude: { type: number, description: "추출된 경도" }
+                  capturedAt: { type: string, description: "사진 촬영 시간" }
 
-  /travels/{id}/photos:
+  /posts:
     get:
-      summary: "여행별 사진첩 조회"
-      tags: [Photo]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+      summary: "전체 게시글 피드 조회"
+      description: "모든 사용자가 공유한 게시글을 최신순으로 가져옵니다. 인스타그램 홈 피드와 동일합니다."
+      tags: [Post]
       responses:
-        200: { description: "성공" }
+        200:
+          description: "성공"
     post:
-      summary: "사진첩에 사진 등록 (Snapshot 포함)"
-      tags: [Photo]
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+      summary: "게시글 공유 (AI 일정 요약 포함)"
+      description: |
+        여행 중 찍은 사진들을 묶어 피드에 게시합니다. 
+        **중요:** `photoIds`를 보내면 서버가 해당 여행의 `travel_plan_items`를 읽어 AI(Gemini)를 통해 자동으로 텍스트 요약을 생성하여 본문에 넣습니다.
+      tags: [Post]
       requestBody:
         required: true
         content:
@@ -209,7 +221,47 @@ paths:
             schema:
               type: object
               properties:
-                imageUrl: { type: string }
-                isSnapshot: { type: boolean }
+                travelId: 
+                  type: string
+                  format: uuid
+                  description: "원본 여행 ID"
+                title: 
+                  type: string
+                  description: "게시글 제목"
+                  example: "나의 완벽했던 제주 3일"
+                photoIds:
+                  type: array
+                  description: "게시글에 포함할 사진 ID 리스트 (미리 업로드된 ID)"
+                  items: { type: string, format: uuid }
       responses:
         201: { description: "생성됨" }
+
+  /search/ai:
+    get:
+      summary: "Gemini AI 기반 자연어 검색"
+      description: |
+        "제주도 감성 숙소 추천해줘" 같은 자연어 질문을 처리합니다.
+        AI가 현재 DB의 기록들과 학습된 지식을 결합하여 답변을 생성합니다.
+      tags: [Search]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: "검색어 또는 질문"
+          schema: { type: string }
+          example: "제주도 서귀포 쪽 맛집 알려줘"
+      responses:
+        200:
+          description: "AI 답변 반환"
+
+components:
+  schemas:
+    TravelDTO:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        startDate: { type: string }
+        endDate: { type: string }
+        regionName: { type: string, nullable: true }
+        isPublic: { type: boolean }
