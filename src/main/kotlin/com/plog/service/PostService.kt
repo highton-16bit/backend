@@ -1,0 +1,144 @@
+package com.plog.service
+
+import com.plog.dto.*
+import com.plog.entity.*
+import com.plog.repository.*
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.util.*
+
+@Service
+@Transactional(readOnly = true)
+class PostService(
+    private val postRepository: PostRepository,
+    private val postLikeRepository: PostLikeRepository,
+    private val bookmarkRepository: BookmarkRepository,
+    private val travelPhotoRepository: TravelPhotoRepository,
+    private val planItemRepository: TravelPlanItemRepository,
+    private val geminiService: GeminiService
+) {
+    fun findAll(): List<PostResponse> {
+        return postRepository.findAllByOrderByCreatedAtDesc()
+            .map { it.toResponse() }
+    }
+
+    fun findById(id: UUID): PostResponse? {
+        return postRepository.findById(id).orElse(null)?.toResponse()
+    }
+
+    @Transactional
+    fun create(user: User, travel: Travel, request: PostCreateRequest, photoIds: List<UUID>): PostCreateResponse {
+        // 일정 조회하여 AI 프롬프트 생성
+        val plans = planItemRepository.findByTravelIdOrderByDateAscStartTimeAsc(travel.id)
+            .map { "${it.date} ${it.startTime ?: ""} : ${it.memo ?: "일정"}" }
+
+        val prompt = """
+            다음은 사용자의 여행 일정 목록입니다:
+            ${plans.joinToString("\n")}
+
+            이 일정들을 바탕으로, 인스타그램에 올릴 만한 감성적이고 따뜻한 여행 에세이(본문)를 작성해주세요.
+            너무 길지 않게 3~5문장 정도로 작성해주고, 해시태그도 2~3개 포함해주세요.
+            이모지도 적절히 섞어주세요.
+        """.trimIndent()
+
+        val aiSummary = try {
+            geminiService.generateText(prompt)
+        } catch (e: Exception) {
+            plans.joinToString("\n")
+        }
+
+        val post = Post(
+            travel = travel,
+            user = user,
+            title = request.title,
+            contentSummary = aiSummary
+        )
+
+        // 사진 매핑
+        photoIds.forEach { photoId ->
+            travelPhotoRepository.findById(photoId).ifPresent { photo ->
+                post.photos.add(photo)
+            }
+        }
+
+        val saved = postRepository.save(post)
+        return PostCreateResponse(id = saved.id.toString(), summary = aiSummary)
+    }
+
+    @Transactional
+    fun toggleLike(userId: UUID, postId: UUID, user: User, post: Post) {
+        val exists = postLikeRepository.existsByUserIdAndPostId(userId, postId)
+
+        if (exists) {
+            postLikeRepository.deleteByUserIdAndPostId(userId, postId)
+            post.likeCount = maxOf(0, post.likeCount - 1)
+        } else {
+            val like = PostLike(
+                id = PostLikeId(userId, postId),
+                user = user,
+                post = post
+            )
+            postLikeRepository.save(like)
+            post.likeCount += 1
+        }
+    }
+
+    @Transactional
+    fun toggleBookmark(userId: UUID, postId: UUID, user: User, post: Post) {
+        val exists = bookmarkRepository.existsByUserIdAndPostId(userId, postId)
+
+        if (exists) {
+            bookmarkRepository.deleteByUserIdAndPostId(userId, postId)
+        } else {
+            val bookmark = Bookmark(
+                id = BookmarkId(userId, postId),
+                user = user,
+                post = post
+            )
+            bookmarkRepository.save(bookmark)
+        }
+    }
+
+    fun findBookmarkedPosts(userId: UUID): List<PostResponse> {
+        return bookmarkRepository.findBookmarkedPosts(userId)
+            .map { it.toResponse() }
+    }
+
+    fun getPostEntity(id: UUID): Post? {
+        return postRepository.findById(id).orElse(null)
+    }
+
+    @Transactional
+    fun incrementCloneCount(postId: UUID) {
+        postRepository.findById(postId).ifPresent { post ->
+            post.cloneCount += 1
+        }
+    }
+
+    private fun Post.toResponse(): PostResponse {
+        val photosWithCoords = photos.filter { it.latitude != null && it.longitude != null }
+        val avgLat = photosWithCoords.mapNotNull { it.latitude }.takeIf { it.isNotEmpty() }?.average()
+        val avgLng = photosWithCoords.mapNotNull { it.longitude }.takeIf { it.isNotEmpty() }?.average()
+
+        return PostResponse(
+            id = id.toString(),
+            title = title,
+            contentSummary = contentSummary,
+            likeCount = likeCount,
+            cloneCount = cloneCount,
+            createdAt = createdAt.toString(),
+            username = user.username,
+            photos = photos.map { photo ->
+                PostPhotoResponse(
+                    id = photo.id.toString(),
+                    url = photo.imageUrl,
+                    latitude = photo.latitude,
+                    longitude = photo.longitude
+                )
+            },
+            regionName = travel.regionName,
+            latitude = avgLat,
+            longitude = avgLng
+        )
+    }
+}
