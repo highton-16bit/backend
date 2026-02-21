@@ -327,6 +327,8 @@ function TravelsTab({ travels, onRefresh }: any) {
   // Create Plan State
   const [newPlanMemo, setNewPlanMemo] = useState('')
   const [newPlanDate, setNewPlanDate] = useState('')
+  const [newPlanStartTime, setNewPlanStartTime] = useState('')
+  const [newPlanEndTime, setNewPlanEndTime] = useState('')
 
   const handleDetail = async (id: string) => {
     setSelectedId(id)
@@ -343,8 +345,15 @@ function TravelsTab({ travels, onRefresh }: any) {
   const handleAddPlan = async () => {
     if (!newPlanMemo || !selectedId) return
     try {
-      await axios.post(`${API_URL}/travels/${selectedId}/plans`, { date: newPlanDate, memo: newPlanMemo })
+      await axios.post(`${API_URL}/travels/${selectedId}/plans`, { 
+        date: newPlanDate, 
+        startTime: newPlanStartTime,
+        endTime: newPlanEndTime,
+        memo: newPlanMemo 
+      })
       setNewPlanMemo('')
+      setNewPlanStartTime('')
+      setNewPlanEndTime('')
       handleDetail(selectedId)
     } catch (e) { alert("일정 추가 실패") }
   }
@@ -379,20 +388,37 @@ function TravelsTab({ travels, onRefresh }: any) {
              <h4 className="font-black text-sm uppercase tracking-widest text-blue-600 px-1">Add Schedule</h4>
              <div className="flex flex-col gap-3">
                <input type="date" className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold" value={newPlanDate} onChange={e => setNewPlanDate(e.target.value)} />
+               <div className="grid grid-cols-2 gap-2">
+                 <div className="space-y-1">
+                   <label className="text-[8px] font-black uppercase text-slate-400 px-1">Start</label>
+                   <input type="time" className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold" value={newPlanStartTime} onChange={e => setNewPlanStartTime(e.target.value)} />
+                 </div>
+                 <div className="space-y-1">
+                   <label className="text-[8px] font-black uppercase text-slate-400 px-1">End</label>
+                   <input type="time" className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold" value={newPlanEndTime} onChange={e => setNewPlanEndTime(e.target.value)} />
+                 </div>
+               </div>
                <input className="w-full p-3 bg-slate-50 rounded-xl text-xs font-bold" placeholder="메모 (예: 성산일출봉 가기)" value={newPlanMemo} onChange={e => setNewPlanMemo(e.target.value)} />
-               <button onClick={handleAddPlan} className="bg-blue-600 text-white p-3 rounded-xl font-black text-xs">Add Plan</button>
+               <button onClick={handleAddPlan} className="bg-blue-600 text-white p-4 rounded-xl font-black text-xs shadow-lg shadow-blue-100 active:scale-95 transition-all">Add Plan</button>
              </div>
           </div>
           <div className="space-y-4">
              {plans.map((p: any) => (
                <div key={p.id} className="flex gap-4 group">
                   <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100"><Clock size={16}/></div>
-                    <div className="w-0.5 h-full bg-slate-100 my-1"></div>
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100 shadow-sm"><Clock size={16}/></div>
+                    <div className="w-0.5 h-full bg-slate-100 my-1 group-last:hidden"></div>
                   </div>
-                  <div className="pb-8">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{p.date}</p>
-                    <p className="font-bold text-slate-800">{p.memo}</p>
+                  <div className="pb-8 flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{p.date}</p>
+                      {(p.startTime || p.endTime) && (
+                        <p className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                          {p.startTime || '--:--'} ~ {p.endTime || '--:--'}
+                        </p>
+                      )}
+                    </div>
+                    <p className="font-bold text-slate-800 text-sm leading-tight">{p.memo}</p>
                   </div>
                </div>
              ))}
